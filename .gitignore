@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Hardhat build artifacts
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+
+# Frontend build outputs
+frontend/dist/
+frontend/build/
+.next/
+
+# Environment & local settings
+.env
+.env.local
+.env.production.local
+*.log
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

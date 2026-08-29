@@ -1,0 +1,204 @@
+const hre = require("hardhat");
+const fs = require("fs");
+const path = require("path");
+
+async function main() {
+    const [deployer] = await hre.ethers.getSigners();
+
+    const MockAggregator = await hre.ethers.getContractFactory("MockAggregator");
+    const btcFeed = await MockAggregator.deploy(7700000000000);
+    await btcFeed.waitForDeployment();
+    const ethFeed = await MockAggregator.deploy(240000000000);
+    await ethFeed.waitForDeployment();
+    const suiFeed = await MockAggregator.deploy(75000000);
+    await suiFeed.waitForDeployment();
+    const nearFeed = await MockAggregator.deploy(180000000);
+    await nearFeed.waitForDeployment();
+    const arbFeed = await MockAggregator.deploy(55000000);
+    await arbFeed.waitForDeployment();
+    const opFeed = await MockAggregator.deploy(160000000);
+    await opFeed.waitForDeployment();
+    const linkFeed = await MockAggregator.deploy(1400000000);
+    await linkFeed.waitForDeployment();
+    const solFeed = await MockAggregator.deploy(13500000000);
+    await solFeed.waitForDeployment();
+
+    const MockERC20 = await hre.ethers.getContractFactory("MockERC20");
+    const supply = hre.ethers.parseUnits("1000000", 18);
+
+    const wbtc = await MockERC20.deploy("Wrapped Bitcoin", "WBTC", 18, supply);
+    await wbtc.waitForDeployment();
+    const weth = await MockERC20.deploy("Wrapped Ether", "WETH", 18, supply);
+    await weth.waitForDeployment();
+    const sui = await MockERC20.deploy("Sui Token", "SUI", 18, supply);
+    await sui.waitForDeployment();
+    const near = await MockERC20.deploy("NEAR Protocol", "NEAR", 18, supply);
+    await near.waitForDeployment();
+    const arb = await MockERC20.deploy("Arbitrum", "ARB", 18, supply);
+    await arb.waitForDeployment();
+    const op = await MockERC20.deploy("Optimism", "OP", 18, supply);
+    await op.waitForDeployment();
+    const link = await MockERC20.deploy("Chainlink", "LINK", 18, supply);
+    await link.waitForDeployment();
+    const sol = await MockERC20.deploy("Solana Token", "SOL", 18, supply);
+    await sol.waitForDeployment();
+    const usdt = await MockERC20.deploy("Tether USD", "USDT", 18, supply);
+    await usdt.waitForDeployment();
+
+    const MockSwapRouter = await hre.ethers.getContractFactory("MockSwapRouter");
+    const swapRouter = await MockSwapRouter.deploy();
+    await swapRouter.waitForDeployment();
+
+    const feedsArray = [
+        await btcFeed.getAddress(),
+        await ethFeed.getAddress(),
+        await suiFeed.getAddress(),
+        await nearFeed.getAddress(),
+        await arbFeed.getAddress(),
+        await opFeed.getAddress(),
+        await linkFeed.getAddress(),
+        await solFeed.getAddress(),
+    ];
+
+    const tokensArray = [
+        await wbtc.getAddress(),
+        await weth.getAddress(),
+        await sui.getAddress(),
+        await near.getAddress(),
+        await arb.getAddress(),
+        await op.getAddress(),
+        await link.getAddress(),
+        await sol.getAddress(),
+        await usdt.getAddress(),
+    ];
+
+    const PriceOracle = await hre.ethers.getContractFactory("PriceOracle");
+    const priceOracle = await PriceOracle.deploy(feedsArray);
+    await priceOracle.waitForDeployment();
+
+    await swapRouter.setOracleAndTokens(
+        await priceOracle.getAddress(),
+        tokensArray
+    );
+
+    const PortfolioManager = await hre.ethers.getContractFactory("PortfolioManager");
+    const portfolioManager = await PortfolioManager.deploy(
+        await swapRouter.getAddress(),
+        await priceOracle.getAddress(),
+        tokensArray
+    );
+    await portfolioManager.waitForDeployment();
+
+    const addresses = {
+        portfolioManager: await portfolioManager.getAddress(),
+        priceOracle: await priceOracle.getAddress(),
+        wbtc: await wbtc.getAddress(),
+        weth: await weth.getAddress(),
+        sui: await sui.getAddress(),
+        near: await near.getAddress(),
+        arb: await arb.getAddress(),
+        op: await op.getAddress(),
+        link: await link.getAddress(),
+        sol: await sol.getAddress(),
+        usdt: await usdt.getAddress(),
+    };
+
+    const configContent = `export const PORTFOLIO_MANAGER_ADDRESS = "${addresses.portfolioManager}";
+export const PRICE_ORACLE_ADDRESS = "${addresses.priceOracle}";
+export const USDT_ADDRESS = "${addresses.usdt}";
+
+export const TOKEN_ADDRESSES = {
+  WBTC: "${addresses.wbtc}",
+  WETH: "${addresses.weth}",
+  SUI: "${addresses.sui}",
+  NEAR: "${addresses.near}",
+  ARB: "${addresses.arb}",
+  OP: "${addresses.op}",
+  LINK: "${addresses.link}",
+  SOL: "${addresses.sol}",
+  USDT: "${addresses.usdt}",
+};
+
+export const PRICE_FEED_ADDRESSES = {
+  BTC: "${await btcFeed.getAddress()}",
+  ETH: "${await ethFeed.getAddress()}",
+  SUI: "${await suiFeed.getAddress()}",
+  NEAR: "${await nearFeed.getAddress()}",
+  ARB: "${await arbFeed.getAddress()}",
+  OP: "${await opFeed.getAddress()}",
+  LINK: "${await linkFeed.getAddress()}",
+  SOL: "${await solFeed.getAddress()}",
+};
+
+export const ASSET_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "USDT"];
+export const ASSET_COLORS = ["#F7931A", "#627EEA", "#4DA2FF", "#00C08B", "#28A0F0", "#FF0420", "#375BD2", "#14F195", "#26A17B"];
+
+export const DEPOSIT_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "USDT"];
+export const EXTENDED_ASSET_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL"];
+
+export const BINANCE_SYMBOLS = {
+  WBTC: "BTCUSDT",
+  WETH: "ETHUSDT",
+  SUI: "SUIUSDT",
+  NEAR: "NEARUSDT",
+  ARB: "ARBUSDT",
+  OP: "OPUSDT",
+  LINK: "LINKUSDT",
+  SOL: "SOLUSDT",
+};
+
+export const EXTENDED_ASSET_COLORS = {
+  WBTC: "#F7931A",
+  WETH: "#627EEA",
+  SUI: "#4DA2FF",
+  NEAR: "#00C08B",
+  ARB: "#28A0F0",
+  OP: "#FF0420",
+  LINK: "#375BD2",
+  SOL: "#14F195",
+  USDT: "#26A17B",
+};
+
+export const PORTFOLIO_MANAGER_ABI = [
+  "function deposit(uint256 assetIndex, uint256 amount) external",
+  "function withdraw(uint256 assetIndex, uint256 amount) external",
+  "function setTargetAllocation(uint256[9] allocations) external",
+  "function executeRebalance() external",
+  "function executeRebalanceFor(address user) external",
+  "function getInvestorBalances(address user) external view returns (uint256[9])",
+  "function getTargetAllocations(address user) external view returns (uint256[9])",
+  "function getPortfolioValue(address user) external view returns (uint256 totalUsd, uint256[9] assetValuesUsd)",
+  "function supportedTokens(uint256) external view returns (address)",
+  "event Deposited(address indexed user, uint256 indexed assetIndex, uint256 amount)",
+  "event AllocationSet(address indexed user, uint256[9] allocations)",
+  "event SwapExecuted(address indexed user, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut)",
+];
+
+export const PRICE_ORACLE_ABI = [
+  "function getLatestPrices() external view returns (int256[9])",
+  "function checkDeviation(uint256[9] calldata balances, uint256[9] calldata targetAllocations, uint256 thresholdBps) external view returns (bool)",
+];
+
+export const ERC20_ABI = [
+  "function balanceOf(address owner) external view returns (uint256)",
+  "function approve(address spender, uint256 amount) external returns (bool)",
+  "function allowance(address owner, address spender) external view returns (uint256)",
+  "function symbol() external view returns (string)",
+  "function decimals() external view returns (uint8)",
+];
+`;
+
+    const configPath = path.resolve(__dirname, "../../frontend/src/config/contracts.js");
+    fs.mkdirSync(path.dirname(configPath), { recursive: true });
+    fs.writeFileSync(configPath, configContent, "utf-8");
+
+    console.log("Deployer:", deployer.address);
+    console.log("USDT Token:", addresses.usdt);
+    console.log("PortfolioManager deployed to:", addresses.portfolioManager);
+    console.log("Frontend config written to:", configPath);
+}
+
+main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

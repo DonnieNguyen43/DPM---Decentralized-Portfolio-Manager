@@ -1,0 +1,28 @@
+{
+  "generated_at": "2026-08-29T17:08:45.418212",
+  "risk_free_rate": 0.05,
+  "market_premium": 0.08,
+  "assets": [
+    "BTC",
+    "ETH",
+    "SUI",
+    "NEAR"
+  ],
+  "weights_decimal": [
+    0.25,
+    0.25,
+    0.25,
+    0.25
+  ],
+  "weights_basis_points": [
+    2500,
+    2500,
+    2500,
+    2500
+  ],
+  "portfolio_metrics": {
+    "expected_annual_return": 0.13,
+    "annual_volatility": 0.642283,
+    "sharpe_ratio": 0.124556
+  }
+}
