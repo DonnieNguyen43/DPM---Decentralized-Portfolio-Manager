@@ -27,7 +27,7 @@
    - Automatic risk categorization: `BALANCED`, `OVERWEIGHT` (+0.5%), and `UNDERWEIGHT` (-0.5%).
    - Total Absolute Drift metric calculation.
 
-<img width="1827" height="836" alt="image" src="https://github.com/user-attachments/assets/86ba5e71-579b-49c7-bcda-29e08c7c6c42" />
+<img width="1702" height="607" alt="image" src="https://github.com/user-attachments/assets/bbb700e1-308c-4412-9738-9b52474b6b1a" />
 
 
 3. **🔄 2-Step Rebalance Review Modal**:
@@ -35,7 +35,7 @@
    - Shows detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
    - Interactive **Before vs After** allocation preview.
 
-<img width="805" height="785" alt="image" src="https://github.com/user-attachments/assets/06ac00e3-0f03-4b72-ac79-55836cb1f1d5" />
+<img width="1827" height="836" alt="image" src="https://github.com/user-attachments/assets/86ba5e71-579b-49c7-bcda-29e08c7c6c42" />
 
 
 4. **⚡ Smart Range Sliders & Auto Equal Weight**:
