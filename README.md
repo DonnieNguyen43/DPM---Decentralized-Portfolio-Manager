@@ -10,20 +10,33 @@
 
 ---
 
+<img width="1831" height="871" alt="image" src="https://github.com/user-attachments/assets/f1fe6385-da62-439d-a8c2-96b9b58dfd2e" />
+
+---
+
 ## ✨ Core Features
 
 1. **⚡ USDT Single-Asset Zap-in & Multi-Asset Deposits**:
    - Single-click deposit using **USDT** (zap-in) or direct deposits for 8 crypto assets (`WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`).
+
+<img width="1732" height="722" alt="image" src="https://github.com/user-attachments/assets/17ae9752-52ff-4cd2-9774-53925c4aa151" />
+
 
 2. **📊 Real-time Allocation Drift & Risk Monitoring Table**:
    - Live calculation of **Drift (%) = Actual (%) - Target (%)**.
    - Automatic risk categorization: `BALANCED`, `OVERWEIGHT` (+0.5%), and `UNDERWEIGHT` (-0.5%).
    - Total Absolute Drift metric calculation.
 
+<img width="1715" height="662" alt="image" src="https://github.com/user-attachments/assets/30c4bec9-04ae-447a-9b60-a57ce126bc20" />
+
+
 3. **🔄 2-Step Rebalance Review Modal**:
    - Simulated execution plan table prior to executing on-chain transactions.
    - Shows detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
    - Interactive **Before vs After** allocation preview.
+
+<img width="805" height="785" alt="image" src="https://github.com/user-attachments/assets/06ac00e3-0f03-4b72-ac79-55836cb1f1d5" />
+
 
 4. **⚡ Smart Range Sliders & Auto Equal Weight**:
    - Real-time range sliders (0-100%) with a 100% total progress bar.
@@ -34,8 +47,14 @@
    - Candlestick price chart with 1m, 15m, 1h, and 1d timeframes powered by live Binance WebSocket & REST Klines.
    - Real-time Portfolio Value Sparkline chart reflecting 24h PnL trends.
 
+<img width="1737" height="537" alt="image" src="https://github.com/user-attachments/assets/3db071ac-03d7-4dd7-8b7e-c03c27b5bfd4" />
+
+
 6. **📜 Transaction History & Grouped Accordions**:
    - Grouped swap log accordion displaying all past rebalancing batches with transaction hashes and status badges.
+
+<img width="1713" height="861" alt="image" src="https://github.com/user-attachments/assets/b47d1dda-5e45-4606-a64b-7f3e4019c36c" />
+
 
 ---
 
