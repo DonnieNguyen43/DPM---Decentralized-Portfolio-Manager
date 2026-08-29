@@ -1,4 +1,4 @@
-# 🚀 DPM — Decentralized Portfolio Manager
+#  DPM — Decentralized Portfolio Manager
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636.svg?logo=solidity)](https://soliditylang.org/)
@@ -16,46 +16,46 @@
 
 ## ✨ Key Features & Technical Highlights
 
-1. **🪙 10 Supported Crypto Assets (including BNB)**:
+1. ** 10 Supported Crypto Assets (including BNB)**:
    - Non-custodial support for 10 crypto assets: `WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`, `BNB`, and `USDT`.
    - Single-click deposit using **USDT** (zap-in) or direct multi-asset deposits.
 
 <img width="1775" height="727" alt="image" src="https://github.com/user-attachments/assets/a07d351c-d25c-4349-930b-ea6360e44480" />
 
-2. **⚡ Bounded Multi-pass Smart Rebalance Algorithm**:
+2. ** Bounded Multi-pass Smart Rebalance Algorithm**:
    - Refactored `PortfolioManager.sol` using bounded `while` loops (`swapUsd = Math.min(excessUsd, maxDeficitUsd)`) to iteratively satisfy asset deficits without overshooting or leaving residual imbalance.
    - Auto-syncs UI slider target allocations to on-chain state before executing rebalance.
 
-3. **📊 Real-Time Allocation Drift & Risk Monitoring Table**:
+3. ** Real-Time Allocation Drift & Risk Monitoring Table**:
    - Live calculation of **Drift (%) = Actual (%) - Target (%)**.
    - Automatic risk categorization: `BALANCED`, `OVERWEIGHT` (+0.5%), and `UNDERWEIGHT` (-0.5%).
    - Total Absolute Drift metric calculation.
 
 <img width="1702" height="607" alt="image" src="https://github.com/user-attachments/assets/bbb700e1-308c-4412-9738-9b52474b6b1a" />
 
-4. **🔄 2-Step Rebalance Review Modal**:
+4. ** 2-Step Rebalance Review Modal**:
    - Simulated execution plan table matching smart contract logic prior to on-chain execution.
    - Detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
    - Interactive **Before vs After** allocation preview.
 
 <img width="1632" height="828" alt="image" src="https://github.com/user-attachments/assets/3539706a-bc02-4e00-8f84-2ebfcf002460" />
 
-5. **🎨 Vibrant 10-Color System & Glassmorphism UI**:
+5. ** Vibrant 10-Color System & Glassmorphism UI**:
    - 10 distinct, vibrant brand colors for each token (`WBTC` Orange, `WETH` Purple, `SUI` Cyan, `NEAR` Emerald Green, `ARB` Electric Blue, `OP` Crimson Red, `LINK` Royal Blue, `SOL` Neon Magenta, `BNB` Amber Yellow, `USDT` Mint Teal).
    - High-contrast Asset Ticker Grid: held assets highlighted with brand-colored borders and micro-gradients; 0% balance assets pushed to the back with dashed borders.
 
-6. **🍩 Sleek Donut Charts & 2-Column Legend Grid**:
+6. ** Sleek Donut Charts & 2-Column Legend Grid**:
    - Integrated center stats badge inside donut charts (`100% TARGET` / `$Total PORTFOLIO`).
    - Clean 2-column legend grid positioned above charts with deterministic sorting (active assets ordered by allocation %, 0% inactive assets pushed to the bottom in muted gray).
    - Custom floating glassmorphism tooltips preventing text collision.
 
-7. **📈 Interactive Price Charts & Live Binance Oracles**:
+7. ** Interactive Price Charts & Live Binance Oracles**:
    - Candlestick price chart with 1m, 15m, 1h, and 1d timeframes powered by live Binance WebSocket & REST Klines.
    - Live real-time price oracle updater script (`updatePrices.js`) continuously refreshing 9 asset price feeds on Hardhat Localhost.
 
 <img width="1742" height="536" alt="image" src="https://github.com/user-attachments/assets/06f19b41-df50-4f63-8d15-dbf9d0ea046b" />
 
-8. **📜 Transaction History & Grouped Accordions**:
+8. ** Transaction History & Grouped Accordions**:
    - Grouped swap log accordion displaying all past rebalancing batches with transaction hashes and status badges.
 
 <img width="1713" height="861" alt="image" src="https://github.com/user-attachments/assets/b47d1dda-5e45-4606-a64b-7f3e4019c36c" />
