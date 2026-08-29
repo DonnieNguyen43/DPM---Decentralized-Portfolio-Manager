@@ -48,7 +48,7 @@
    - Candlestick price chart with 1m, 15m, 1h, and 1d timeframes powered by live Binance WebSocket & REST Klines.
    - Real-time Portfolio Value Sparkline chart reflecting 24h PnL trends.
 
-<img width="1737" height="537" alt="image" src="https://github.com/user-attachments/assets/3db071ac-03d7-4dd7-8b7e-c03c27b5bfd4" />
+<img width="1742" height="536" alt="image" src="https://github.com/user-attachments/assets/06f19b41-df50-4f63-8d15-dbf9d0ea046b" />
 
 
 6. **📜 Transaction History & Grouped Accordions**:
