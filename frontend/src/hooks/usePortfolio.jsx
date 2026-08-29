@@ -20,10 +20,10 @@ export function PortfolioProvider({ children }) {
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
   const [nativeBalance, setNativeBalance] = useState("0");
-  const [balances, setBalances] = useState(Array(9).fill(0n));
-  const [targetAllocations, setTargetAllocations] = useState(Array(9).fill(0n));
-  const [portfolioValue, setPortfolioValue] = useState({ total: 0n, assets: Array(9).fill(0n) });
-  const [prices, setPrices] = useState(Array(9).fill(0n));
+  const [balances, setBalances] = useState(Array(10).fill(0n));
+  const [targetAllocations, setTargetAllocations] = useState(Array(10).fill(0n));
+  const [portfolioValue, setPortfolioValue] = useState({ total: 0n, assets: Array(10).fill(0n) });
+  const [prices, setPrices] = useState(Array(10).fill(0n));
   const [swapEvents, setSwapEvents] = useState([]);
   
   // Cost Basis & Real-time PnL states
@@ -52,7 +52,13 @@ export function PortfolioProvider({ children }) {
   const getOrInitCostBasis = useCallback((userAddress, currentValUsd) => {
     if (!userAddress) return 0;
     const key = `dpm_cost_basis_${userAddress.toLowerCase()}`;
+    const timeKey = `dpm_first_deposit_time_${userAddress.toLowerCase()}`;
     try {
+      if (currentValUsd <= 0) {
+        localStorage.removeItem(key);
+        localStorage.removeItem(timeKey);
+        return 0;
+      }
       const saved = localStorage.getItem(key);
       if (saved && parseFloat(saved) > 0) {
         return parseFloat(saved);
@@ -120,9 +126,9 @@ export function PortfolioProvider({ children }) {
     setProvider(null);
     setSigner(null);
     setNativeBalance("0");
-    setBalances(Array(9).fill(0n));
-    setTargetAllocations(Array(9).fill(0n));
-    setPortfolioValue({ total: 0n, assets: Array(9).fill(0n) });
+    setBalances(Array(10).fill(0n));
+    setTargetAllocations(Array(10).fill(0n));
+    setPortfolioValue({ total: 0n, assets: Array(10).fill(0n) });
     setSwapEvents([]);
     setTotalDepositedUsd(0);
     setPnl24hUsd(0);
@@ -267,6 +273,13 @@ export function PortfolioProvider({ children }) {
           }
           return trimmed;
         });
+      } else {
+        setPortfolioHistory([]);
+        try {
+          localStorage.removeItem(HISTORY_STORAGE_KEY);
+        } catch (e) {
+          console.warn("Could not clear history:", e);
+        }
       }
     } catch (err) {
       console.error("Portfolio refresh failed:", err);
@@ -322,27 +335,15 @@ export function PortfolioProvider({ children }) {
         const assetIndex = ASSET_SYMBOLS.indexOf(tokenSymbol);
         if (assetIndex === -1) throw new Error("Invalid asset symbol");
 
-        if (tokenSymbol === "USDT") {
-          const usdtAddress = TOKEN_ADDRESSES["USDT"];
-          const usdtContract = new ethers.Contract(usdtAddress, ERC20_ABI, signer);
-          const allowance = await usdtContract.allowance(account, PORTFOLIO_MANAGER_ADDRESS);
-          if (allowance < amount) {
-            const approveTx = await usdtContract.approve(PORTFOLIO_MANAGER_ADDRESS, ethers.MaxUint256);
-            await approveTx.wait();
-          }
-          const tx = await contract.depositUsdt(amount);
-          await tx.wait();
-        } else {
-          const tokenAddr = TOKEN_ADDRESSES[tokenSymbol];
-          const tokenContract = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
-          const allowance = await tokenContract.allowance(account, PORTFOLIO_MANAGER_ADDRESS);
-          if (allowance < amount) {
-            const approveTx = await tokenContract.approve(PORTFOLIO_MANAGER_ADDRESS, ethers.MaxUint256);
-            await approveTx.wait();
-          }
-          const tx = await contract.deposit(assetIndex, amount);
-          await tx.wait();
+        const tokenAddr = TOKEN_ADDRESSES[tokenSymbol];
+        const tokenContract = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
+        const allowance = await tokenContract.allowance(account, PORTFOLIO_MANAGER_ADDRESS);
+        if (allowance < amount) {
+          const approveTx = await tokenContract.approve(PORTFOLIO_MANAGER_ADDRESS, ethers.MaxUint256);
+          await approveTx.wait();
         }
+        const tx = await contract.deposit(assetIndex, amount);
+        await tx.wait();
 
         const amountNum = Number(ethers.formatEther(amount));
         const priceNum = tokenSymbol === "USDT" ? 1.0 : Number(prices[assetIndex] || 0n) / 1e8;

@@ -22,20 +22,20 @@ async function main() {
     const userAddress = signers[0].address; // Monitor user Account 0
 
     console.log("==================================================");
-    console.log("  DEFI AUTOMATED REBALANCE KEEPER BOT (9 ASSETS)");
+    console.log("  DEFI AUTOMATED REBALANCE KEEPER BOT (10 ASSETS)");
     console.log("  Keeper Account:", keeperSigner.address);
     console.log("  Monitoring User:", userAddress);
     console.log("  PortfolioManager:", portfolioManagerAddress);
     console.log("==================================================");
 
     const pmAbi = [
-        "function getInvestorBalances(address user) external view returns (uint256[9])",
-        "function getTargetAllocations(address user) external view returns (uint256[9])",
+        "function getInvestorBalances(address user) external view returns (uint256[10])",
+        "function getTargetAllocations(address user) external view returns (uint256[10])",
         "function executeRebalanceFor(address user) external",
     ];
 
     const oracleAbi = [
-        "function checkDeviation(uint256[9] calldata balances, uint256[9] calldata targetAllocations, uint256 thresholdBps) external view returns (bool)",
+        "function checkDeviation(uint256[10] calldata balances, uint256[10] calldata targetAllocations, uint256 thresholdBps) external view returns (bool)",
     ];
 
     const pmContract = new hre.ethers.Contract(portfolioManagerAddress, pmAbi, keeperSigner);

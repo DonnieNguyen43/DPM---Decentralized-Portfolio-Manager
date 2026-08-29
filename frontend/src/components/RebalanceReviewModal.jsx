@@ -32,16 +32,16 @@ export default function RebalanceReviewModal({
     currentTotalUsd += valUsd;
   }
 
-  // Simulate Rebalancing Swaps matching PortfolioManager.sol logic
+  // Simulate Rebalancing Swaps matching PortfolioManager.sol bounded while-loop logic
   const simulatedSwaps = [];
   const afterAssetValues = [...assetValuesUsd];
 
   if (currentTotalUsd > 0) {
     for (let i = 0; i < NUM_ASSETS; i++) {
       const targetUsd = (currentTotalUsd * Number(targetAllocations[i] || 0n)) / 10000;
-      if (afterAssetValues[i] > targetUsd) {
+
+      while (afterAssetValues[i] > targetUsd + 0.01) {
         const excessUsd = afterAssetValues[i] - targetUsd;
-        if (excessUsd < 0.01) continue;
 
         // Find largest deficit
         let maxDeficit = 0;
@@ -49,7 +49,7 @@ export default function RebalanceReviewModal({
         for (let j = 0; j < NUM_ASSETS; j++) {
           if (j === i) continue;
           const targetJUsd = (currentTotalUsd * Number(targetAllocations[j] || 0n)) / 10000;
-          if (targetJUsd > afterAssetValues[j]) {
+          if (targetJUsd > afterAssetValues[j] + 0.01) {
             const def = targetJUsd - afterAssetValues[j];
             if (def > maxDeficit) {
               maxDeficit = def;
@@ -58,25 +58,30 @@ export default function RebalanceReviewModal({
           }
         }
 
-        if (bestDeficitIndex !== i && maxDeficit > 0) {
-          const sellPrice = Number(prices[i] || 0n) / 1e8;
-          const buyPrice = Number(prices[bestDeficitIndex] || 0n) / 1e8;
+        if (bestDeficitIndex === i || maxDeficit <= 0) break;
 
-          const sellAmount = sellPrice > 0 ? excessUsd / sellPrice : 0;
-          const buyAmount = buyPrice > 0 ? excessUsd / buyPrice : 0;
+        const swapUsd = Math.min(excessUsd, maxDeficit);
+        if (swapUsd < 0.01) break;
 
-          simulatedSwaps.push({
-            tokenIn: ASSET_SYMBOLS[i],
-            amountIn: sellAmount,
-            tokenOut: ASSET_SYMBOLS[bestDeficitIndex],
-            amountOut: buyAmount,
-            usdValue: excessUsd,
-            priceImpact: "< 0.1%",
-          });
+        const sellPrice = Number(prices[i] || 0n) / 1e8;
+        const buyPrice = Number(prices[bestDeficitIndex] || 0n) / 1e8;
 
-          afterAssetValues[i] -= excessUsd;
-          afterAssetValues[bestDeficitIndex] += excessUsd;
-        }
+        const sellAmount = sellPrice > 0 ? swapUsd / sellPrice : 0;
+        const buyAmount = buyPrice > 0 ? swapUsd / buyPrice : 0;
+
+        if (sellAmount <= 0) break;
+
+        simulatedSwaps.push({
+          tokenIn: ASSET_SYMBOLS[i],
+          amountIn: sellAmount,
+          tokenOut: ASSET_SYMBOLS[bestDeficitIndex],
+          amountOut: buyAmount,
+          usdValue: swapUsd,
+          priceImpact: "< 0.1%",
+        });
+
+        afterAssetValues[i] -= swapUsd;
+        afterAssetValues[bestDeficitIndex] += swapUsd;
       }
     }
   }

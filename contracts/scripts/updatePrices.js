@@ -11,6 +11,7 @@ const PAIRS = [
     { symbol: "OPUSDT", key: "OP" },
     { symbol: "LINKUSDT", key: "LINK" },
     { symbol: "SOLUSDT", key: "SOL" },
+    { symbol: "BNBUSDT", key: "BNB" },
 ];
 
 async function fetchBinancePrices() {

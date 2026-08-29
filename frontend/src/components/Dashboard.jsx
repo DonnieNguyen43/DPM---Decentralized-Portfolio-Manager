@@ -184,6 +184,13 @@ export default function Dashboard() {
   const handleConfirmRebalance = async () => {
     setActionLoading(true);
     try {
+      if (isAllocationValid) {
+        const bps = allocationInputs.map((v) => Math.round(parseFloat(v || "0") * 100));
+        const needsUpdate = targetAllocations.some((a, i) => Number(a) !== bps[i]);
+        if (needsUpdate) {
+          await setAllocations(bps);
+        }
+      }
       await rebalance();
       setIsReviewModalOpen(false);
       setHasInitializedSliders(false); // Re-sync once with updated contract state
@@ -198,6 +205,22 @@ export default function Dashboard() {
     setActionLoading(false);
   };
 
+  const CustomPieTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+      const item = payload[0];
+      const colorIdx = ASSET_SYMBOLS.indexOf(item.name);
+      const color = colorIdx !== -1 ? ASSET_COLORS[colorIdx] : "#fff";
+      return (
+        <div className="custom-pie-tooltip">
+          <span className="tooltip-dot" style={{ background: color }}></span>
+          <span className="tooltip-title">{item.name}</span>
+          <span className="tooltip-val">{Number(item.value).toFixed(1)}%</span>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const renderPieChart = (data, title) => {
     if (data.length === 0) {
       return (
@@ -210,49 +233,34 @@ export default function Dashboard() {
 
     const isTarget = title.includes("Target");
 
-    // Sort legend items: Active assets first (descending %), 0% assets pushed to the end
+    // Sort legend items identically for both charts:
+    // 1. Active assets (highest allocation %) first
+    // 2. Inactive 0% assets pushed to the bottom
+    // 3. Deterministic tie-breaker for 100% row-for-row match on both sides
     const legendItems = [...assetMetrics].sort((a, b) => {
-      const valA = isTarget ? a.targetPct : a.actualPct;
-      const valB = isTarget ? b.targetPct : b.actualPct;
-      return valB - valA;
+      const maxA = Math.max(a.targetPct, a.actualPct);
+      const maxB = Math.max(b.targetPct, b.actualPct);
+
+      if (Math.abs(maxA - maxB) > 0.001) {
+        return maxB - maxA; // Descending by percentage
+      }
+
+      const idxA = ASSET_SYMBOLS.indexOf(a.name);
+      const idxB = ASSET_SYMBOLS.indexOf(b.name);
+      return idxA - idxB;
     });
 
     return (
       <div className="pie-container">
-        <h4 className="pie-chart-subtitle">{title}</h4>
-        <div className="pie-responsive-wrapper">
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={48}
-                outerRadius={88}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {data.map((entry) => {
-                  const colorIdx = ASSET_SYMBOLS.indexOf(entry.name);
-                  const color = colorIdx !== -1 ? ASSET_COLORS[colorIdx] : "#8f96a3";
-                  return <Cell key={`cell-${entry.name}`} fill={color} />;
-                })}
-              </Pie>
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "#16172b",
-                  borderColor: "#ffffff1a",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-                formatter={(val) => `${typeof val === "number" ? val.toFixed(2) : val}%`}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+        <div className="pie-header-row">
+          <h4 className="pie-chart-subtitle">{title}</h4>
+          <span className="pie-header-badge">
+            {isTarget ? "100.0% Target" : `$${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </span>
         </div>
 
-        {/* Legend Grid: Active assets first with glowing dots, 0% assets with muted dots */}
-        <div className="custom-legend-grid-9">
+        {/* Legend Grid: 2 columns, left aligned symbol, right aligned percentage pill */}
+        <div className="custom-legend-grid-top">
           {legendItems.map((item) => {
             const val = isTarget ? item.targetPct : item.actualPct;
             const isZero = item.usdValue < 0.01 && item.targetPct < 0.05;
@@ -261,29 +269,69 @@ export default function Dashboard() {
                 key={item.name}
                 className={`custom-legend-item ${isZero ? "legend-muted" : ""}`}
               >
-                <span
-                  className="legend-dot"
-                  style={{
-                    background: isZero ? "rgba(255, 255, 255, 0.15)" : item.color,
-                    boxShadow: isZero ? "none" : `0 0 6px ${item.color}80`,
-                  }}
-                ></span>
-                <span className="legend-name">{item.name}</span>
+                <div className="legend-left">
+                  <span
+                    className="legend-dot"
+                    style={{
+                      background: isZero ? "rgba(255, 255, 255, 0.15)" : item.color,
+                      boxShadow: isZero ? "none" : `0 0 6px ${item.color}80`,
+                    }}
+                  ></span>
+                  <span className="legend-name" style={{ color: isZero ? "var(--text-secondary)" : item.color }}>
+                    {item.name}
+                  </span>
+                </div>
                 <span className="legend-val">{val.toFixed(1)}%</span>
               </div>
             );
           })}
         </div>
+
+        {/* Donut Chart with Center Information Overlay */}
+        <div className="pie-responsive-wrapper" style={{ position: "relative" }}>
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={64}
+                outerRadius={92}
+                paddingAngle={2}
+                dataKey="value"
+                stroke="rgba(255, 255, 255, 0.06)"
+                strokeWidth={1}
+              >
+                {data.map((entry) => {
+                  const colorIdx = ASSET_SYMBOLS.indexOf(entry.name);
+                  const color = colorIdx !== -1 ? ASSET_COLORS[colorIdx] : "#8f96a3";
+                  return <Cell key={`cell-${entry.name}`} fill={color} />;
+                })}
+              </Pie>
+              <Tooltip content={<CustomPieTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+
+          {/* Donut Center Info Badge */}
+          <div className="donut-center-overlay">
+            <div className="donut-center-val">
+              {isTarget ? "100%" : totalUsd > 0 ? `$${totalUsd.toFixed(0)}` : "$0"}
+            </div>
+            <div className="donut-center-sub">{isTarget ? "TARGET" : "PORTFOLIO"}</div>
+          </div>
+        </div>
       </div>
     );
   };
 
-  const is24hPos = pnl24hUsd >= 0;
-  const sparkColor = is24hPos ? "#10b981" : "#ef4444";
+  const is24hPos = pnl24hUsd > 0;
+  const is24hNeg = pnl24hUsd < 0;
+  const sparkColor = is24hNeg ? "#ef4444" : "#10b981";
 
   // Build trend chart data matching 24h PnL direction
-  let sparklineData = [...portfolioHistory];
+  let sparklineData = [];
   if (totalUsd > 0) {
+    sparklineData = [...portfolioHistory];
     const val24hStart = totalUsd - pnl24hUsd;
     if (sparklineData.length < 2) {
       sparklineData = [
@@ -298,6 +346,13 @@ export default function Dashboard() {
     }
   }
 
+  const getPnlClass = (valUsd, hasBalance) => {
+    if (!hasBalance || totalUsd === 0) return "pnl-neutral";
+    if (valUsd > 0) return "pnl-up";
+    if (valUsd < 0) return "pnl-down";
+    return "pnl-neutral";
+  };
+
   return (
     <div className="dashboard">
       {/* 1. Portfolio Value & Performance Card */}
@@ -311,16 +366,20 @@ export default function Dashboard() {
           </div>
 
           <div className="pnl-metrics">
-            <div className={`pnl-badge ${is24hPos ? "pnl-up" : "pnl-down"}`}>
+            <div className={`pnl-badge ${getPnlClass(pnl24hUsd, totalUsd > 0)}`}>
               <span className="pnl-label">24h PnL</span>
               <span className="pnl-value">
-                {is24hPos ? "+" : ""}${pnl24hUsd.toFixed(2)} ({is24hPos ? "+" : ""}{pnl24hPct.toFixed(2)}%)
+                {totalUsd > 0 ? (
+                  `${pnl24hUsd >= 0 ? "+" : ""}$${pnl24hUsd.toFixed(2)} (${pnl24hPct >= 0 ? "+" : ""}${pnl24hPct.toFixed(2)}%)`
+                ) : (
+                  "$0.00 (0.00%)"
+                )}
               </span>
             </div>
-            <div className={`pnl-badge ${totalPnlUsd >= 0 ? "pnl-up" : "pnl-down"}`}>
+            <div className={`pnl-badge ${getPnlClass(totalPnlUsd, totalDepositedUsd > 0 && totalUsd > 0)}`}>
               <span className="pnl-label">Total PnL</span>
               <span className="pnl-value">
-                {totalDepositedUsd > 0 ? (
+                {totalDepositedUsd > 0 && totalUsd > 0 ? (
                   `${totalPnlUsd >= 0 ? "+" : ""}$${totalPnlUsd.toFixed(2)} (${totalPnlPct >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}%)`
                 ) : (
                   "$0.00 (0.00%)"
@@ -368,32 +427,78 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Asset Grid */}
-        <div className="asset-grid" style={{ marginTop: "20px" }}>
-          {ASSET_SYMBOLS.map((sym, i) => {
-            const isUsdt = sym === "USDT";
-            return (
-              <div
-                key={sym}
-                className={`asset-item ${selectedChartSymbol === sym ? "selected-asset" : ""} ${isUsdt ? "usdt-asset-item" : ""}`}
-                onClick={() => !isUsdt && setSelectedChartSymbol(sym)}
-                style={{ cursor: isUsdt ? "default" : "pointer" }}
-              >
-                <span className="asset-dot" style={{ background: ASSET_COLORS[i] }}></span>
-                <span className="asset-name">{sym}</span>
-                <span className="asset-value">
-                  ${Number(ethers.formatEther(portfolioValue.assets[i] || 0n)).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
-                </span>
-                <span className="asset-price">
-                  @{isUsdt ? "$1.00" : `$${(Number(prices[i] || 0n) / 1e8).toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+        {/* Asset Grid: Held assets highlighted first, non-held ($0.00) pushed to the back */}
+        {(() => {
+          const sortedAssetGrid = ASSET_SYMBOLS.map((sym, i) => {
+            const usdVal = Number(ethers.formatEther(portfolioValue.assets[i] || 0n));
+            const priceVal = sym === "USDT" ? 1.0 : Number(prices[i] || 0n) / 1e8;
+            return {
+              sym,
+              index: i,
+              color: ASSET_COLORS[i],
+              usdVal,
+              priceVal,
+              isHeld: usdVal >= 0.01,
+            };
+          }).sort((a, b) => {
+            if (a.isHeld !== b.isHeld) {
+              return a.isHeld ? -1 : 1;
+            }
+            if (a.isHeld && b.isHeld) {
+              return b.usdVal - a.usdVal;
+            }
+            return a.index - b.index;
+          });
+
+          return (
+            <div className="asset-grid" style={{ marginTop: "20px" }}>
+              {sortedAssetGrid.map((item) => {
+                const isUsdt = item.sym === "USDT";
+                const isSelected = selectedChartSymbol === item.sym;
+                return (
+                  <div
+                    key={item.sym}
+                    className={`asset-item ${item.isHeld ? "asset-held" : "asset-unheld"} ${isSelected ? "selected-asset" : ""} ${isUsdt ? "usdt-asset-item" : ""}`}
+                    onClick={() => !isUsdt && setSelectedChartSymbol(item.sym)}
+                    style={{
+                      cursor: isUsdt ? "default" : "pointer",
+                      borderColor: item.isHeld ? `${item.color}55` : "rgba(255, 255, 255, 0.06)",
+                      background: item.isHeld
+                        ? `linear-gradient(135deg, ${item.color}15 0%, rgba(255, 255, 255, 0.02) 100%)`
+                        : "rgba(255, 255, 255, 0.015)",
+                    }}
+                  >
+                    <span
+                      className="asset-dot"
+                      style={{
+                        background: item.isHeld ? item.color : "rgba(255, 255, 255, 0.2)",
+                        boxShadow: item.isHeld ? `0 0 8px ${item.color}a0` : "none",
+                      }}
+                    ></span>
+                    <span
+                      className="asset-name"
+                      style={{ color: item.isHeld ? item.color : "var(--text-muted)", fontWeight: 700 }}
+                    >
+                      {item.sym}
+                    </span>
+                    <span
+                      className="asset-value"
+                      style={{ color: item.isHeld ? "#ffffff" : "var(--text-muted)" }}
+                    >
+                      ${item.usdVal.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
+                    </span>
+                    <span className="asset-price">
+                      @{isUsdt ? "$1.00" : `$${item.priceVal.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
         {loading && <div className="loading-bar"></div>}
       </div>
 
@@ -642,7 +747,11 @@ export default function Dashboard() {
         onClose={() => setIsReviewModalOpen(false)}
         onConfirm={handleConfirmRebalance}
         balances={balances}
-        targetAllocations={targetAllocations}
+        targetAllocations={
+          isAllocationValid
+            ? allocationInputs.map((v) => BigInt(Math.round(parseFloat(v || "0") * 100)))
+            : targetAllocations
+        }
         prices={prices}
         totalUsd={totalUsd}
         actionLoading={actionLoading}

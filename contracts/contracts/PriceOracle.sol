@@ -4,8 +4,8 @@ pragma solidity ^0.8.20;
 import "./interfaces/AggregatorV3Interface.sol";
 
 contract PriceOracle {
-    uint256 public constant NUM_ASSETS = 9;
-    uint256 public constant NUM_FEEDS = 8;
+    uint256 public constant NUM_ASSETS = 10;
+    uint256 public constant NUM_FEEDS = 9;
     uint256 public constant BASIS_POINTS = 10000;
 
     address public immutable owner;
@@ -23,7 +23,7 @@ contract PriceOracle {
             (, prices[i], , , ) = feeds[i].latestRoundData();
             require(prices[i] > 0, "INVALID_PRICE");
         }
-        prices[8] = 100000000; // USDT fixed price = $1.00 USD (8 decimals)
+        prices[9] = 100000000; // USDT fixed price = $1.00 USD (8 decimals)
     }
 
     function checkDeviation(

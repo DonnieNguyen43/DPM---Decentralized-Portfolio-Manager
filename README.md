@@ -4,58 +4,61 @@
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636.svg?logo=solidity)](https://soliditylang.org/)
 [![Hardhat](https://img.shields.io/badge/Hardhat-2.22.0-yellow.svg)](https://hardhat.org/)
 [![React](https://img.shields.io/badge/React-18.2.0-61DAFB.svg?logo=react)](https://reactjs.org/)
-[![Vite](https://img.shields.io/badge/Vite-5.0.0-646CFF.svg?logo=vite)](https://vitejs.js.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.0.0-646CFF.svg?logo=vite)](https://vitejs.org/)
 
-**Decentralized Portfolio Manager (DPM)** is a state-of-the-art non-custodial Web3 protocol designed for automated multi-asset portfolio management, risk monitoring, real-time allocation drift tracking, and 2-step review rebalancing.
+**Decentralized Portfolio Manager (DPM)** is a state-of-the-art non-custodial Web3 protocol designed for automated multi-asset portfolio management, real-time price feed integration, allocation drift tracking, bounded multi-pass rebalancing, and 2-step execution review.
 
 ---
 
 <img width="1841" height="698" alt="image" src="https://github.com/user-attachments/assets/51fa2b89-c4eb-4dd0-aec7-a05395aea009" />
 
-
 ---
 
-## ✨ Core Features
+## ✨ Key Features & Technical Highlights
 
-1. **⚡ USDT Single-Asset Zap-in & Multi-Asset Deposits**:
-   - Single-click deposit using **USDT** (zap-in) or direct deposits for 9 crypto assets (`WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`,`BNB`).
+1. **🪙 10 Supported Crypto Assets (including BNB)**:
+   - Non-custodial support for 10 crypto assets: `WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`, `BNB`, and `USDT`.
+   - Single-click deposit using **USDT** (zap-in) or direct multi-asset deposits.
 
 <img width="1775" height="727" alt="image" src="https://github.com/user-attachments/assets/a07d351c-d25c-4349-930b-ea6360e44480" />
 
+2. **⚡ Bounded Multi-pass Smart Rebalance Algorithm**:
+   - Refactored `PortfolioManager.sol` using bounded `while` loops (`swapUsd = Math.min(excessUsd, maxDeficitUsd)`) to iteratively satisfy asset deficits without overshooting or leaving residual imbalance.
+   - Auto-syncs UI slider target allocations to on-chain state before executing rebalance.
 
-2. **📊 Real-time Allocation Drift & Risk Monitoring Table**:
+3. **📊 Real-Time Allocation Drift & Risk Monitoring Table**:
    - Live calculation of **Drift (%) = Actual (%) - Target (%)**.
    - Automatic risk categorization: `BALANCED`, `OVERWEIGHT` (+0.5%), and `UNDERWEIGHT` (-0.5%).
    - Total Absolute Drift metric calculation.
 
 <img width="1702" height="607" alt="image" src="https://github.com/user-attachments/assets/bbb700e1-308c-4412-9738-9b52474b6b1a" />
 
-
-3. **🔄 2-Step Rebalance Review Modal**:
-   - Simulated execution plan table prior to executing on-chain transactions.
-   - Shows detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
+4. **🔄 2-Step Rebalance Review Modal**:
+   - Simulated execution plan table matching smart contract logic prior to on-chain execution.
+   - Detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
    - Interactive **Before vs After** allocation preview.
 
 <img width="1632" height="828" alt="image" src="https://github.com/user-attachments/assets/3539706a-bc02-4e00-8f84-2ebfcf002460" />
 
+5. **🎨 Vibrant 10-Color System & Glassmorphism UI**:
+   - 10 distinct, vibrant brand colors for each token (`WBTC` Orange, `WETH` Purple, `SUI` Cyan, `NEAR` Emerald Green, `ARB` Electric Blue, `OP` Crimson Red, `LINK` Royal Blue, `SOL` Neon Magenta, `BNB` Amber Yellow, `USDT` Mint Teal).
+   - High-contrast Asset Ticker Grid: held assets highlighted with brand-colored borders and micro-gradients; 0% balance assets pushed to the back with dashed borders.
 
-4. **⚡ Smart Range Sliders & Auto Equal Weight**:
-   - Real-time range sliders (0-100%) with a 100% total progress bar.
-   - `⚡ Equal Weight` button for instant equal percentage distribution.
-   - Target sliders automatically persist and load current contract target allocations without unwanted auto-resets.
+6. **🍩 Sleek Donut Charts & 2-Column Legend Grid**:
+   - Integrated center stats badge inside donut charts (`100% TARGET` / `$Total PORTFOLIO`).
+   - Clean 2-column legend grid positioned above charts with deterministic sorting (active assets ordered by allocation %, 0% inactive assets pushed to the bottom in muted gray).
+   - Custom floating glassmorphism tooltips preventing text collision.
 
-5. **📈 Interactive Price Charts & Sparklines**:
+7. **📈 Interactive Price Charts & Live Binance Oracles**:
    - Candlestick price chart with 1m, 15m, 1h, and 1d timeframes powered by live Binance WebSocket & REST Klines.
-   - Real-time Portfolio Value Sparkline chart reflecting 24h PnL trends.
+   - Live real-time price oracle updater script (`updatePrices.js`) continuously refreshing 9 asset price feeds on Hardhat Localhost.
 
 <img width="1742" height="536" alt="image" src="https://github.com/user-attachments/assets/06f19b41-df50-4f63-8d15-dbf9d0ea046b" />
 
-
-6. **📜 Transaction History & Grouped Accordions**:
+8. **📜 Transaction History & Grouped Accordions**:
    - Grouped swap log accordion displaying all past rebalancing batches with transaction hashes and status badges.
 
 <img width="1713" height="861" alt="image" src="https://github.com/user-attachments/assets/b47d1dda-5e45-4606-a64b-7f3e4019c36c" />
-
 
 ---
 
@@ -80,11 +83,11 @@
                    └──────────────────────┘ └───────────────────┘
 ```
 
-- **Smart Contracts**: Solidity `^0.8.20`, OpenZeppelin Contracts v5.
+- **Smart Contracts**: Solidity `^0.8.20` (compiled with `--via-ir`), OpenZeppelin Contracts v5.
 - **Development Framework**: Hardhat, Ethers.js v6.
 - **Frontend UI/UX**: React 18, Vite, Vanilla CSS with custom glassmorphism design system.
 - **Data Visualizations**: Recharts, Lightweight Charts.
-- **Market Data Feeds**: Binance API (REST & WebSockets), Chainlink Aggregator V3 feeds.
+- **Market Data Feeds**: Binance REST & WebSocket API, Chainlink Aggregator V3 feeds.
 
 ---
 
@@ -96,7 +99,7 @@ defi-portfolio-manager/
 │   ├── contracts/           # Solidity Contracts
 │   │   ├── PortfolioManager.sol
 │   │   ├── PriceOracle.sol
-│   │   └── mocks/           # Mock ERC20, SwapRouter, Aggregator
+│   │   └── mocks/           # Mock ERC20 (WBTC, WETH, BNB, USDT...), SwapRouter, Aggregators
 │   └── scripts/             # Deployment & Keeper Scripts
 │       ├── deploy.js
 │       ├── updatePrices.js
@@ -145,7 +148,7 @@ cd contracts
 npx hardhat run scripts/deploy.js --network localhost
 ```
 
-### 4. Start Real-time Price Feeder (Binance Live Prices)
+### 4. Start Real-time Price Feeder (Binance Live Prices for 10 Assets)
 
 Open Terminal 3 (Price Oracle Feeder):
 ```bash

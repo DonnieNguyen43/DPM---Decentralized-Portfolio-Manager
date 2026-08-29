@@ -22,6 +22,8 @@ async function main() {
     await linkFeed.waitForDeployment();
     const solFeed = await MockAggregator.deploy(13500000000);
     await solFeed.waitForDeployment();
+    const bnbFeed = await MockAggregator.deploy(58000000000);
+    await bnbFeed.waitForDeployment();
 
     const MockERC20 = await hre.ethers.getContractFactory("MockERC20");
     const supply = hre.ethers.parseUnits("1000000", 18);
@@ -42,6 +44,8 @@ async function main() {
     await link.waitForDeployment();
     const sol = await MockERC20.deploy("Solana Token", "SOL", 18, supply);
     await sol.waitForDeployment();
+    const bnb = await MockERC20.deploy("Binance Coin", "BNB", 18, supply);
+    await bnb.waitForDeployment();
     const usdt = await MockERC20.deploy("Tether USD", "USDT", 18, supply);
     await usdt.waitForDeployment();
 
@@ -58,6 +62,7 @@ async function main() {
         await opFeed.getAddress(),
         await linkFeed.getAddress(),
         await solFeed.getAddress(),
+        await bnbFeed.getAddress(),
     ];
 
     const tokensArray = [
@@ -69,6 +74,7 @@ async function main() {
         await op.getAddress(),
         await link.getAddress(),
         await sol.getAddress(),
+        await bnb.getAddress(),
         await usdt.getAddress(),
     ];
 
@@ -100,6 +106,7 @@ async function main() {
         op: await op.getAddress(),
         link: await link.getAddress(),
         sol: await sol.getAddress(),
+        bnb: await bnb.getAddress(),
         usdt: await usdt.getAddress(),
     };
 
@@ -116,6 +123,7 @@ export const TOKEN_ADDRESSES = {
   OP: "${addresses.op}",
   LINK: "${addresses.link}",
   SOL: "${addresses.sol}",
+  BNB: "${addresses.bnb}",
   USDT: "${addresses.usdt}",
 };
 
@@ -128,13 +136,14 @@ export const PRICE_FEED_ADDRESSES = {
   OP: "${await opFeed.getAddress()}",
   LINK: "${await linkFeed.getAddress()}",
   SOL: "${await solFeed.getAddress()}",
+  BNB: "${await bnbFeed.getAddress()}",
 };
 
-export const ASSET_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "USDT"];
-export const ASSET_COLORS = ["#F7931A", "#627EEA", "#4DA2FF", "#00C08B", "#28A0F0", "#FF0420", "#375BD2", "#14F195", "#26A17B"];
+export const ASSET_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "BNB", "USDT"];
+export const ASSET_COLORS = ["#F7931A", "#8B5CF6", "#06B6D4", "#10B981", "#3B82F6", "#EF4444", "#1E40AF", "#D946EF", "#F59E0B", "#14B8A6"];
 
-export const DEPOSIT_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "USDT"];
-export const EXTENDED_ASSET_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL"];
+export const DEPOSIT_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "BNB", "USDT"];
+export const EXTENDED_ASSET_SYMBOLS = ["WBTC", "WETH", "SUI", "NEAR", "ARB", "OP", "LINK", "SOL", "BNB"];
 
 export const BINANCE_SYMBOLS = {
   WBTC: "BTCUSDT",
@@ -145,38 +154,40 @@ export const BINANCE_SYMBOLS = {
   OP: "OPUSDT",
   LINK: "LINKUSDT",
   SOL: "SOLUSDT",
+  BNB: "BNBUSDT",
 };
 
 export const EXTENDED_ASSET_COLORS = {
   WBTC: "#F7931A",
-  WETH: "#627EEA",
-  SUI: "#4DA2FF",
-  NEAR: "#00C08B",
-  ARB: "#28A0F0",
-  OP: "#FF0420",
-  LINK: "#375BD2",
-  SOL: "#14F195",
-  USDT: "#26A17B",
+  WETH: "#8B5CF6",
+  SUI: "#06B6D4",
+  NEAR: "#10B981",
+  ARB: "#3B82F6",
+  OP: "#EF4444",
+  LINK: "#1E40AF",
+  SOL: "#D946EF",
+  BNB: "#F59E0B",
+  USDT: "#14B8A6",
 };
 
 export const PORTFOLIO_MANAGER_ABI = [
   "function deposit(uint256 assetIndex, uint256 amount) external",
   "function withdraw(uint256 assetIndex, uint256 amount) external",
-  "function setTargetAllocation(uint256[9] allocations) external",
+  "function setTargetAllocation(uint256[10] allocations) external",
   "function executeRebalance() external",
   "function executeRebalanceFor(address user) external",
-  "function getInvestorBalances(address user) external view returns (uint256[9])",
-  "function getTargetAllocations(address user) external view returns (uint256[9])",
-  "function getPortfolioValue(address user) external view returns (uint256 totalUsd, uint256[9] assetValuesUsd)",
+  "function getInvestorBalances(address user) external view returns (uint256[10])",
+  "function getTargetAllocations(address user) external view returns (uint256[10])",
+  "function getPortfolioValue(address user) external view returns (uint256 totalUsd, uint256[10] assetValuesUsd)",
   "function supportedTokens(uint256) external view returns (address)",
   "event Deposited(address indexed user, uint256 indexed assetIndex, uint256 amount)",
-  "event AllocationSet(address indexed user, uint256[9] allocations)",
+  "event AllocationSet(address indexed user, uint256[10] allocations)",
   "event SwapExecuted(address indexed user, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut)",
 ];
 
 export const PRICE_ORACLE_ABI = [
-  "function getLatestPrices() external view returns (int256[9])",
-  "function checkDeviation(uint256[9] calldata balances, uint256[9] calldata targetAllocations, uint256 thresholdBps) external view returns (bool)",
+  "function getLatestPrices() external view returns (int256[10])",
+  "function checkDeviation(uint256[10] calldata balances, uint256[10] calldata targetAllocations, uint256 thresholdBps) external view returns (bool)",
 ];
 
 export const ERC20_ABI = [

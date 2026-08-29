@@ -10,7 +10,7 @@ import "./interfaces/AggregatorV3Interface.sol";
 contract PortfolioManager is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    uint256 public constant NUM_ASSETS = 9;
+    uint256 public constant NUM_ASSETS = 10;
     uint256 public constant BASIS_POINTS = 10000;
     uint24 public constant POOL_FEE = 3000;
     uint256 public constant SLIPPAGE_BPS = 100;
@@ -122,27 +122,29 @@ contract PortfolioManager is ReentrancyGuard {
 
         for (uint256 i; i < NUM_ASSETS; ++i) {
             uint256 targetValueUsd = (totalValueUsd * inv.targetAllocations[i]) / BASIS_POINTS;
-            if (assetValuesUsd[i] > targetValueUsd) {
+
+            while (assetValuesUsd[i] > targetValueUsd + 1e4) {
                 uint256 excessUsd = assetValuesUsd[i] - targetValueUsd;
-                uint256 sellAmount = (excessUsd * 1e8) / uint256(prices[i]);
-
-                if (sellAmount == 0) continue;
-
-                uint256 bestDeficitIndex = _findLargestDeficit(
+                (uint256 bestDeficitIndex, uint256 maxDeficitUsd) = _findLargestDeficit(
                     assetValuesUsd,
                     inv.targetAllocations,
                     totalValueUsd,
                     i
                 );
 
-                if (bestDeficitIndex == i) continue;
+                if (bestDeficitIndex == i || maxDeficitUsd == 0) break;
 
-                uint256 expectedOut = (excessUsd * 1e8) / uint256(prices[bestDeficitIndex]);
-                uint256 minOut = (expectedOut * (BASIS_POINTS - SLIPPAGE_BPS)) / BASIS_POINTS;
+                uint256 swapUsd = excessUsd < maxDeficitUsd ? excessUsd : maxDeficitUsd;
+                if (swapUsd == 0) break;
 
+                uint256 sellAmount = (swapUsd * 1e8) / uint256(prices[i]);
+                if (sellAmount == 0) break;
                 if (sellAmount > inv.balances[i]) {
                     sellAmount = inv.balances[i];
                 }
+
+                uint256 expectedOut = (swapUsd * 1e8) / uint256(prices[bestDeficitIndex]);
+                uint256 minOut = (expectedOut * (BASIS_POINTS - SLIPPAGE_BPS)) / BASIS_POINTS;
 
                 IERC20(supportedTokens[i]).approve(address(swapRouter), sellAmount);
 
@@ -188,21 +190,21 @@ contract PortfolioManager is ReentrancyGuard {
         uint256[NUM_ASSETS] storage targetAllocations,
         uint256 totalValueUsd,
         uint256 excludeIndex
-    ) internal view returns (uint256) {
-        uint256 maxDeficit;
-        uint256 bestIndex = excludeIndex;
+    ) internal view returns (uint256 bestIndex, uint256 maxDeficitUsd) {
+        maxDeficitUsd = 0;
+        bestIndex = excludeIndex;
         for (uint256 i; i < NUM_ASSETS; ++i) {
             if (i == excludeIndex) continue;
             uint256 targetVal = (totalValueUsd * targetAllocations[i]) / BASIS_POINTS;
             if (targetVal > assetValuesUsd[i]) {
                 uint256 deficit = targetVal - assetValuesUsd[i];
-                if (deficit > maxDeficit) {
-                    maxDeficit = deficit;
+                if (deficit > maxDeficitUsd) {
+                    maxDeficitUsd = deficit;
                     bestIndex = i;
                 }
             }
         }
-        return bestIndex;
+        return (bestIndex, maxDeficitUsd);
     }
 
     function _getPrices() internal view returns (int256[NUM_ASSETS] memory) {
@@ -210,7 +212,7 @@ contract PortfolioManager is ReentrancyGuard {
             abi.encodeWithSignature("getLatestPrices()")
         );
         require(success, "ORACLE_CALL_FAILED");
-        return abi.decode(data, (int256[9]));
+        return abi.decode(data, (int256[10]));
     }
 
     function getInvestorBalances(address user)
