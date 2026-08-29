@@ -10,16 +10,17 @@
 
 ---
 
-<img width="1831" height="871" alt="image" src="https://github.com/user-attachments/assets/f1fe6385-da62-439d-a8c2-96b9b58dfd2e" />
+<img width="1841" height="698" alt="image" src="https://github.com/user-attachments/assets/51fa2b89-c4eb-4dd0-aec7-a05395aea009" />
+
 
 ---
 
 ## ✨ Core Features
 
 1. **⚡ USDT Single-Asset Zap-in & Multi-Asset Deposits**:
-   - Single-click deposit using **USDT** (zap-in) or direct deposits for 8 crypto assets (`WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`).
+   - Single-click deposit using **USDT** (zap-in) or direct deposits for 9 crypto assets (`WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`,`BNB`).
 
-<img width="1732" height="722" alt="image" src="https://github.com/user-attachments/assets/17ae9752-52ff-4cd2-9774-53925c4aa151" />
+<img width="1775" height="727" alt="image" src="https://github.com/user-attachments/assets/a07d351c-d25c-4349-930b-ea6360e44480" />
 
 
 2. **📊 Real-time Allocation Drift & Risk Monitoring Table**:
@@ -35,7 +36,7 @@
    - Shows detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
    - Interactive **Before vs After** allocation preview.
 
-<img width="1827" height="836" alt="image" src="https://github.com/user-attachments/assets/86ba5e71-579b-49c7-bcda-29e08c7c6c42" />
+<img width="1632" height="828" alt="image" src="https://github.com/user-attachments/assets/3539706a-bc02-4e00-8f84-2ebfcf002460" />
 
 
 4. **⚡ Smart Range Sliders & Auto Equal Weight**:
