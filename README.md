@@ -27,7 +27,7 @@
    - Automatic risk categorization: `BALANCED`, `OVERWEIGHT` (+0.5%), and `UNDERWEIGHT` (-0.5%).
    - Total Absolute Drift metric calculation.
 
-<img width="1715" height="662" alt="image" src="https://github.com/user-attachments/assets/30c4bec9-04ae-447a-9b60-a57ce126bc20" />
+<img width="1827" height="836" alt="image" src="https://github.com/user-attachments/assets/86ba5e71-579b-49c7-bcda-29e08c7c6c42" />
 
 
 3. **🔄 2-Step Rebalance Review Modal**:
