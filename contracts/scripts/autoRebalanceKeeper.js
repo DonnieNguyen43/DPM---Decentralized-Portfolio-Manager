@@ -47,8 +47,8 @@ async function main() {
             const rawBalances = await pmContract.getInvestorBalances(userAddress);
             const rawAllocations = await pmContract.getTargetAllocations(userAddress);
 
-            const balances = Array.from(rawBalances);
-            const targetAllocations = Array.from(rawAllocations);
+            const balances = Array.from(rawBalances).map((b) => b.toString());
+            const targetAllocations = Array.from(rawAllocations).map((a) => a.toString());
 
             // Check if user has active target allocation
             const hasAllocations = targetAllocations.some((a) => BigInt(a) > 0n);
@@ -68,7 +68,7 @@ async function main() {
                 await tx.wait();
                 console.log(`[${timestamp}] ✅ [KEEPER BOT] Automated Rebalance successfully completed on-chain!\n`);
             } else {
-                console.log(`[${timestamp}] [KEEPER] Portfolio allocation within 5% threshold. No rebalance needed.`);
+                console.log(`[${timestamp}] [KEEPER] Portfolio allocation within threshold. No rebalance needed.`);
             }
         } catch (err) {
             console.error(`[${new Date().toLocaleTimeString()}] [KEEPER ERROR]:`, err.message);

@@ -43,6 +43,8 @@ contract PriceOracle {
 
         if (totalValueUsd == 0) return false;
 
+        uint256 totalAbsDriftBps;
+
         for (uint256 i; i < NUM_ASSETS; ++i) {
             uint256 actualBps = (assetValuesUsd[i] * BASIS_POINTS) / totalValueUsd;
             uint256 targetBps = targetAllocations[i];
@@ -51,8 +53,12 @@ contract PriceOracle {
                 ? actualBps - targetBps
                 : targetBps - actualBps;
 
+            totalAbsDriftBps += deviation;
+
             if (deviation > thresholdBps) return true;
         }
+
+        if (totalAbsDriftBps > thresholdBps) return true;
 
         return false;
     }

@@ -95,8 +95,45 @@ async function main() {
     );
     await portfolioManager.waitForDeployment();
 
+    const pmAddress = await portfolioManager.getAddress();
+
+    // Mint test tokens to deployer
+    await usdt.mint(deployer.address, hre.ethers.parseEther("100000"));
+    await wbtc.mint(deployer.address, hre.ethers.parseEther("2"));
+    await weth.mint(deployer.address, hre.ethers.parseEther("20"));
+    await sui.mint(deployer.address, hre.ethers.parseEther("500"));
+    await near.mint(deployer.address, hre.ethers.parseEther("500"));
+    await arb.mint(deployer.address, hre.ethers.parseEther("1000"));
+    await op.mint(deployer.address, hre.ethers.parseEther("500"));
+    await link.mint(deployer.address, hre.ethers.parseEther("200"));
+    await sol.mint(deployer.address, hre.ethers.parseEther("50"));
+    await bnb.mint(deployer.address, hre.ethers.parseEther("10"));
+
+    // Approve PortfolioManager
+    await usdt.approve(pmAddress, hre.ethers.parseEther("100000"));
+    await wbtc.approve(pmAddress, hre.ethers.parseEther("2"));
+    await weth.approve(pmAddress, hre.ethers.parseEther("20"));
+    await sui.approve(pmAddress, hre.ethers.parseEther("500"));
+    await near.approve(pmAddress, hre.ethers.parseEther("500"));
+    await arb.approve(pmAddress, hre.ethers.parseEther("1000"));
+    await op.approve(pmAddress, hre.ethers.parseEther("500"));
+    await link.approve(pmAddress, hre.ethers.parseEther("200"));
+    await sol.approve(pmAddress, hre.ethers.parseEther("50"));
+    await bnb.approve(pmAddress, hre.ethers.parseEther("10"));
+
+    // Deposit initial portfolio: USDT 100, WBTC 0.0025, WETH 0.08, SOL 1.48, BNB 0.34
+    await portfolioManager.deposit(9, hre.ethers.parseEther("100")); // USDT
+    await portfolioManager.deposit(0, hre.ethers.parseEther("0.0025")); // WBTC
+    await portfolioManager.deposit(1, hre.ethers.parseEther("0.08")); // WETH
+    await portfolioManager.deposit(7, hre.ethers.parseEther("1.48")); // SOL
+    await portfolioManager.deposit(8, hre.ethers.parseEther("0.34")); // BNB
+
+    // Set initial target allocations on-chain: WBTC 20%, WETH 15%, SOL 15%, BNB 10%, USDT 40%
+    const initialTargets = [2000, 1500, 0, 0, 0, 0, 0, 1500, 1000, 4000];
+    await portfolioManager.setTargetAllocation(initialTargets);
+
     const addresses = {
-        portfolioManager: await portfolioManager.getAddress(),
+        portfolioManager: pmAddress,
         priceOracle: await priceOracle.getAddress(),
         wbtc: await wbtc.getAddress(),
         weth: await weth.getAddress(),
