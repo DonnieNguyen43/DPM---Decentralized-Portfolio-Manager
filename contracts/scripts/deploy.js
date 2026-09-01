@@ -2,27 +2,52 @@ const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 
+async function fetchBinancePrices() {
+    try {
+        const symbols = ["BTCUSDT", "ETHUSDT", "SUIUSDT", "NEARUSDT", "ARBUSDT", "OPUSDT", "LINKUSDT", "SOLUSDT", "BNBUSDT"];
+        const url = `https://api.binance.com/api/v3/ticker/price?symbols=${JSON.stringify(symbols)}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            const map = {};
+            data.forEach((item) => {
+                map[item.symbol] = parseFloat(item.price);
+            });
+            return map;
+        }
+    } catch (e) {
+        console.warn("Could not fetch live prices during deploy:", e.message);
+    }
+    return {};
+}
+
 async function main() {
     const [deployer] = await hre.ethers.getSigners();
+    const livePrices = await fetchBinancePrices();
+
+    const getPrice = (sym, fallback) => {
+        const live = livePrices[sym];
+        return live ? BigInt(Math.round(live * 1e8)) : BigInt(fallback);
+    };
 
     const MockAggregator = await hre.ethers.getContractFactory("MockAggregator");
-    const btcFeed = await MockAggregator.deploy(7700000000000);
+    const btcFeed = await MockAggregator.deploy(getPrice("BTCUSDT", 7700000000000));
     await btcFeed.waitForDeployment();
-    const ethFeed = await MockAggregator.deploy(240000000000);
+    const ethFeed = await MockAggregator.deploy(getPrice("ETHUSDT", 240000000000));
     await ethFeed.waitForDeployment();
-    const suiFeed = await MockAggregator.deploy(75000000);
+    const suiFeed = await MockAggregator.deploy(getPrice("SUIUSDT", 75000000));
     await suiFeed.waitForDeployment();
-    const nearFeed = await MockAggregator.deploy(180000000);
+    const nearFeed = await MockAggregator.deploy(getPrice("NEARUSDT", 180000000));
     await nearFeed.waitForDeployment();
-    const arbFeed = await MockAggregator.deploy(55000000);
+    const arbFeed = await MockAggregator.deploy(getPrice("ARBUSDT", 55000000));
     await arbFeed.waitForDeployment();
-    const opFeed = await MockAggregator.deploy(160000000);
+    const opFeed = await MockAggregator.deploy(getPrice("OPUSDT", 160000000));
     await opFeed.waitForDeployment();
-    const linkFeed = await MockAggregator.deploy(1400000000);
+    const linkFeed = await MockAggregator.deploy(getPrice("LINKUSDT", 1400000000));
     await linkFeed.waitForDeployment();
-    const solFeed = await MockAggregator.deploy(13500000000);
+    const solFeed = await MockAggregator.deploy(getPrice("SOLUSDT", 13500000000));
     await solFeed.waitForDeployment();
-    const bnbFeed = await MockAggregator.deploy(58000000000);
+    const bnbFeed = await MockAggregator.deploy(getPrice("BNBUSDT", 58000000000));
     await bnbFeed.waitForDeployment();
 
     const MockERC20 = await hre.ethers.getContractFactory("MockERC20");
@@ -97,17 +122,20 @@ async function main() {
 
     const pmAddress = await portfolioManager.getAddress();
 
-    // Mint test tokens to deployer
-    await usdt.mint(deployer.address, hre.ethers.parseEther("100000"));
-    await wbtc.mint(deployer.address, hre.ethers.parseEther("2"));
-    await weth.mint(deployer.address, hre.ethers.parseEther("20"));
-    await sui.mint(deployer.address, hre.ethers.parseEther("500"));
-    await near.mint(deployer.address, hre.ethers.parseEther("500"));
-    await arb.mint(deployer.address, hre.ethers.parseEther("1000"));
-    await op.mint(deployer.address, hre.ethers.parseEther("500"));
-    await link.mint(deployer.address, hre.ethers.parseEther("200"));
-    await sol.mint(deployer.address, hre.ethers.parseEther("50"));
-    await bnb.mint(deployer.address, hre.ethers.parseEther("10"));
+    // Mint test tokens to all Hardhat test accounts
+    const allSigners = await hre.ethers.getSigners();
+    for (const signerAcc of allSigners) {
+        await usdt.mint(signerAcc.address, hre.ethers.parseEther("100000"));
+        await wbtc.mint(signerAcc.address, hre.ethers.parseEther("2"));
+        await weth.mint(signerAcc.address, hre.ethers.parseEther("20"));
+        await sui.mint(signerAcc.address, hre.ethers.parseEther("500"));
+        await near.mint(signerAcc.address, hre.ethers.parseEther("500"));
+        await arb.mint(signerAcc.address, hre.ethers.parseEther("1000"));
+        await op.mint(signerAcc.address, hre.ethers.parseEther("500"));
+        await link.mint(signerAcc.address, hre.ethers.parseEther("200"));
+        await sol.mint(signerAcc.address, hre.ethers.parseEther("50"));
+        await bnb.mint(signerAcc.address, hre.ethers.parseEther("10"));
+    }
 
     // Approve PortfolioManager
     await usdt.approve(pmAddress, hre.ethers.parseEther("100000"));

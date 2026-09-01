@@ -1,22 +1,32 @@
 import { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { usePortfolio } from "../hooks/usePortfolio";
 import { ASSET_SYMBOLS, ASSET_COLORS } from "../config/contracts";
-import PriceChart from "./PriceChart";
-import RebalanceReviewModal from "./RebalanceReviewModal";
-import TransactionLog from "./TransactionLog";
+import { useToast } from "./shared/Toast";
 
+// Sub-components
+import PortfolioSummary from "./portfolio/PortfolioSummary";
+import AllocationCharts from "./portfolio/AllocationCharts";
+import DriftTable       from "./portfolio/DriftTable";
+import DepositForm      from "./portfolio/DepositForm";
+import AllocationSliders from "./allocation/AllocationSliders";
+import PriceChart       from "./PriceChart";
+import RebalanceReviewModal from "./RebalanceReviewModal";
+import TransactionLog   from "./TransactionLog";
+import { SkeletonCard } from "./shared/SkeletonLoader";
+
+// ─── Empty / Not Connected state ──────────────────────────────────────────────
+function NotConnected() {
+  return (
+    <div className="card empty-state" role="status">
+      <div className="empty-icon" aria-hidden="true">📊</div>
+      <h3>Connect Your Wallet</h3>
+      <p>Connect a wallet to view your DeFi portfolio, manage allocations, and rebalance on Optimism.</p>
+    </div>
+  );
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 export default function Dashboard() {
   const {
     account,
@@ -36,17 +46,17 @@ export default function Dashboard() {
     rebalance,
   } = usePortfolio();
 
+  const { toastSuccess, toastError, toastWarn, toastPending, updateToast } = useToast();
+
   const NUM_ASSETS = ASSET_SYMBOLS.length;
 
-  const [depositAsset, setDepositAsset] = useState("WBTC");
-  const [depositAmount, setDepositAmount] = useState("");
-  const [allocationInputs, setAllocationInputs] = useState(Array(NUM_ASSETS).fill("0.00"));
+  const [allocationInputs, setAllocationInputs]   = useState(Array(NUM_ASSETS).fill("0.00"));
   const [hasInitializedSliders, setHasInitializedSliders] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [actionLoading, setActionLoading]         = useState(false);
   const [selectedChartSymbol, setSelectedChartSymbol] = useState("WBTC");
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
 
-  // Sync target allocation sliders ONCE on initial load
+  // ── Sync target allocation sliders ONCE on initial load ──
   useEffect(() => {
     if (hasInitializedSliders || !targetAllocations || targetAllocations.length === 0) return;
 
@@ -58,7 +68,7 @@ export default function Dashboard() {
       setHasInitializedSliders(true);
     } else if (portfolioValue && portfolioValue.total > 0n) {
       const totalUsd = Number(ethers.formatEther(portfolioValue.total));
-      const synced = ASSET_SYMBOLS.map((_, i) => {
+      const synced   = ASSET_SYMBOLS.map((_, i) => {
         const assetUsd = Number(ethers.formatEther(portfolioValue.assets[i] || 0n));
         return ((assetUsd / totalUsd) * 100).toFixed(2);
       });
@@ -66,35 +76,37 @@ export default function Dashboard() {
       setHasInitializedSliders(true);
     } else {
       const equalVal = (100 / NUM_ASSETS).toFixed(2);
-      const lastVal = (100 - parseFloat(equalVal) * (NUM_ASSETS - 1)).toFixed(2);
-      const copy = Array(NUM_ASSETS).fill(equalVal);
+      const lastVal  = (100 - parseFloat(equalVal) * (NUM_ASSETS - 1)).toFixed(2);
+      const copy     = Array(NUM_ASSETS).fill(equalVal);
       copy[NUM_ASSETS - 1] = lastVal;
       setAllocationInputs(copy);
       setHasInitializedSliders(true);
     }
-  }, [targetAllocations, portfolioValue, hasInitializedSliders]);
+  }, [targetAllocations, portfolioValue, hasInitializedSliders, NUM_ASSETS]);
 
-  if (!account) {
+  if (!account) return <NotConnected />;
+
+  // Show skeleton if loading and no data yet
+  if (loading && portfolioValue.total === 0n) {
     return (
-      <div className="card empty-state">
-        <div className="empty-icon">📊</div>
-        <p>Connect your wallet to view portfolio</p>
+      <div className="dashboard">
+        <SkeletonCard rows={4} />
+        <SkeletonCard rows={2} />
       </div>
     );
   }
 
+  // ── Computed metrics ──────────────────────────────────────────────────────
   const totalUsd = Number(ethers.formatEther(portfolioValue.total));
-
-  // Compute Target %, Actual %, and Drift %
   let totalAbsDrift = 0;
 
   const assetMetrics = ASSET_SYMBOLS.map((sym, i) => {
-    const assetUsd = Number(ethers.formatEther(portfolioValue.assets[i] || 0n));
-    const priceNum = Number(prices[i] || 0n) / 1e8;
+    const assetUsd  = Number(ethers.formatEther(portfolioValue.assets[i] || 0n));
+    const priceNum  = Number(prices[i] || 0n) / 1e8;
     const actualPct = totalUsd > 0 ? (assetUsd / totalUsd) * 100 : 0;
     const targetPct = Number(targetAllocations[i] || 0n) / 100;
-    const driftPct = actualPct - targetPct;
-    totalAbsDrift += Math.abs(driftPct);
+    const driftPct  = actualPct - targetPct;
+    totalAbsDrift  += Math.abs(driftPct);
 
     return {
       name: sym,
@@ -107,644 +119,157 @@ export default function Dashboard() {
     };
   });
 
-  // Sort asset metrics: Active holdings first (descending USD / %), 0% holdings last
   const sortedAssetMetrics = [...assetMetrics].sort((a, b) => {
     const valA = a.usdValue > 0 ? a.usdValue : Math.max(a.targetPct, a.actualPct);
     const valB = b.usdValue > 0 ? b.usdValue : Math.max(b.targetPct, b.actualPct);
     return valB - valA;
   });
 
-  const targetData = assetMetrics
-    .filter((d) => d.targetPct > 0)
-    .map((d) => ({ name: d.name, value: d.targetPct }));
-
-  const actualData = assetMetrics
-    .filter((d) => d.actualPct > 0)
-    .map((d) => ({ name: d.name, value: d.actualPct }));
-
-  // Allocation Slider Total & Validation
-  const sliderSum = allocationInputs.reduce((sum, val) => sum + (parseFloat(val || "0") || 0), 0);
+  const sliderSum       = allocationInputs.reduce((s, v) => s + (parseFloat(v || "0") || 0), 0);
   const isAllocationValid = Math.abs(sliderSum - 100) < 0.01;
 
-  const handleEqualWeight = () => {
-    const equalVal = (100 / NUM_ASSETS).toFixed(2);
-    const lastVal = (100 - parseFloat(equalVal) * (NUM_ASSETS - 1)).toFixed(2);
-    const copy = Array(NUM_ASSETS).fill(equalVal);
-    copy[NUM_ASSETS - 1] = lastVal;
-    setAllocationInputs(copy);
-  };
-
-  const handleDeposit = async () => {
-    if (!depositAmount || parseFloat(depositAmount) <= 0) return;
-    setActionLoading(true);
-    try {
-      const amount = ethers.parseUnits(depositAmount, 18);
-      await deposit(depositAsset, amount);
-      setDepositAmount("");
-      alert(`Đã nạp ${depositAmount} ${depositAsset} thành công!`);
-    } catch (err) {
-      console.error("Deposit failed:", err);
-      const msg = err?.reason || err?.message || "";
-      if (!msg.includes("user rejected") && !msg.includes("ACTION_REJECTED")) {
-        alert("Nạp tiền thất bại: " + (err.reason || "Giao dịch bị hủy hoặc lỗi mạng."));
-      }
-    }
-    setActionLoading(false);
-  };
-
-  const handleSetAllocations = async () => {
-    if (!isAllocationValid) {
-      alert("Tổng tỷ lệ phân bổ phải đúng bằng 100%");
-      return;
-    }
-    const bps = allocationInputs.map((v) => Math.round(parseFloat(v || "0") * 100));
-    setActionLoading(true);
-    try {
-      await setAllocations(bps);
-      setHasInitializedSliders(false); // Re-sync once with updated contract state
-      alert("Đã cập nhật tỷ lệ phân bổ mục tiêu thành công!");
-    } catch (err) {
-      console.error("Set allocation failed:", err);
-      const msg = err?.reason || err?.message || "";
-      if (!msg.includes("user rejected") && !msg.includes("ACTION_REJECTED")) {
-        alert("Thiết lập tỷ lệ thất bại: " + (err.reason || err.message || "Lỗi giao dịch."));
-      }
-    }
-    setActionLoading(false);
-  };
-
-  const handleRebalanceClick = () => {
+  // ── Handlers ──────────────────────────────────────────────────────────────
+  const handleRebalanceClick = async () => {
     if (totalUsd === 0) {
-      alert("Không thể Rebalance: Danh mục của bạn đang trống ($0). Vui lòng Nạp tiền (Deposit) trước.");
+      toastWarn("Portfolio is Empty", {
+        message: "Please deposit tokens before running a rebalance.",
+      });
       return;
     }
+
+    // Save allocation on-chain first (1 TX) if sliders have changed
+    if (isAllocationValid) {
+      const bps = allocationInputs.map((v) => Math.round(parseFloat(v || "0") * 100));
+      const needsUpdate = targetAllocations.some((a, i) => Number(a) !== bps[i]);
+      if (needsUpdate) {
+        const saveId = toastPending("Saving allocation on-chain…", {
+          message: "Please confirm in MetaMask",
+        });
+        try {
+          await setAllocations(bps);
+          updateToast(saveId, {
+            type: "success",
+            title: "Allocation Saved",
+            message: "Target allocations updated on-chain.",
+          });
+        } catch (err) {
+          const reason = err?.reason || err?.message || "";
+          if (!reason.includes("user rejected") && !reason.includes("ACTION_REJECTED")) {
+            updateToast(saveId, { type: "error", title: "Save Failed", message: reason });
+          } else {
+            updateToast(saveId, { type: "warn", title: "Cancelled", message: "You rejected the transaction." });
+          }
+          return; // Don't open modal if allocation save failed
+        }
+      }
+    }
+
     setIsReviewModalOpen(true);
   };
 
   const handleConfirmRebalance = async () => {
     setActionLoading(true);
-    try {
-      if (isAllocationValid) {
-        const bps = allocationInputs.map((v) => Math.round(parseFloat(v || "0") * 100));
-        const needsUpdate = targetAllocations.some((a, i) => Number(a) !== bps[i]);
-        if (needsUpdate) {
-          await setAllocations(bps);
-        }
-      }
-      await rebalance();
-      setIsReviewModalOpen(false);
-      setHasInitializedSliders(false); // Re-sync once with updated contract state
-      alert("Đã thực hiện tái cân bằng danh mục (Rebalance) thành công!");
-    } catch (err) {
-      console.error("Rebalance failed:", err);
-      const reason = err?.reason || err?.message || "";
-      if (!reason.includes("user rejected") && !reason.includes("ACTION_REJECTED")) {
-        alert("Rebalance thất bại: " + (err.reason || "Lỗi giao dịch hoán đổi."));
-      }
-    }
-    setActionLoading(false);
-  };
-
-  const CustomPieTooltip = ({ active, payload }) => {
-    if (active && payload && payload.length) {
-      const item = payload[0];
-      const colorIdx = ASSET_SYMBOLS.indexOf(item.name);
-      const color = colorIdx !== -1 ? ASSET_COLORS[colorIdx] : "#fff";
-      return (
-        <div className="custom-pie-tooltip">
-          <span className="tooltip-dot" style={{ background: color }}></span>
-          <span className="tooltip-title">{item.name}</span>
-          <span className="tooltip-val">{Number(item.value).toFixed(1)}%</span>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const renderPieChart = (data, title) => {
-    if (data.length === 0) {
-      return (
-        <div className="pie-container empty-pie">
-          <h4 className="pie-chart-subtitle">{title}</h4>
-          <p className="no-data">No allocation data</p>
-        </div>
-      );
-    }
-
-    const isTarget = title.includes("Target");
-
-    // Sort legend items identically for both charts:
-    // 1. Active assets (highest allocation %) first
-    // 2. Inactive 0% assets pushed to the bottom
-    // 3. Deterministic tie-breaker for 100% row-for-row match on both sides
-    const legendItems = [...assetMetrics].sort((a, b) => {
-      const maxA = Math.max(a.targetPct, a.actualPct);
-      const maxB = Math.max(b.targetPct, b.actualPct);
-
-      if (Math.abs(maxA - maxB) > 0.001) {
-        return maxB - maxA; // Descending by percentage
-      }
-
-      const idxA = ASSET_SYMBOLS.indexOf(a.name);
-      const idxB = ASSET_SYMBOLS.indexOf(b.name);
-      return idxA - idxB;
+    const pendingId = toastPending("Executing rebalance on-chain…", {
+      message: "Awaiting MetaMask confirmation",
     });
 
-    return (
-      <div className="pie-container">
-        <div className="pie-header-row">
-          <h4 className="pie-chart-subtitle">{title}</h4>
-          <span className="pie-header-badge">
-            {isTarget ? "100.0% Target" : `$${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-          </span>
-        </div>
+    try {
+      const tx = await rebalance();
 
-        {/* Legend Grid: 2 columns, left aligned symbol, right aligned percentage pill */}
-        <div className="custom-legend-grid-top">
-          {legendItems.map((item) => {
-            const val = isTarget ? item.targetPct : item.actualPct;
-            const isZero = item.usdValue < 0.01 && item.targetPct < 0.05;
-            return (
-              <div
-                key={item.name}
-                className={`custom-legend-item ${isZero ? "legend-muted" : ""}`}
-              >
-                <div className="legend-left">
-                  <span
-                    className="legend-dot"
-                    style={{
-                      background: isZero ? "rgba(255, 255, 255, 0.15)" : item.color,
-                      boxShadow: isZero ? "none" : `0 0 6px ${item.color}80`,
-                    }}
-                  ></span>
-                  <span className="legend-name" style={{ color: isZero ? "var(--text-secondary)" : item.color }}>
-                    {item.name}
-                  </span>
-                </div>
-                <span className="legend-val">{val.toFixed(1)}%</span>
-              </div>
-            );
-          })}
-        </div>
+      updateToast(pendingId, {
+        type: "success",
+        title: "Rebalance Complete!",
+        message: "Your portfolio has been realigned to target allocations.",
+        txHash: tx?.hash,
+        explorerUrl: "https://optimistic.etherscan.io",
+      });
 
-        {/* Donut Chart with Center Information Overlay */}
-        <div className="pie-responsive-wrapper" style={{ position: "relative" }}>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={64}
-                outerRadius={92}
-                paddingAngle={2}
-                dataKey="value"
-                stroke="rgba(255, 255, 255, 0.06)"
-                strokeWidth={1}
-              >
-                {data.map((entry) => {
-                  const colorIdx = ASSET_SYMBOLS.indexOf(entry.name);
-                  const color = colorIdx !== -1 ? ASSET_COLORS[colorIdx] : "#8f96a3";
-                  return <Cell key={`cell-${entry.name}`} fill={color} />;
-                })}
-              </Pie>
-              <Tooltip content={<CustomPieTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
-
-          {/* Donut Center Info Badge */}
-          <div className="donut-center-overlay">
-            <div className="donut-center-val">
-              {isTarget ? "100%" : totalUsd > 0 ? `$${totalUsd.toFixed(0)}` : "$0"}
-            </div>
-            <div className="donut-center-sub">{isTarget ? "TARGET" : "PORTFOLIO"}</div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const is24hPos = pnl24hUsd > 0;
-  const is24hNeg = pnl24hUsd < 0;
-  const sparkColor = is24hNeg ? "#ef4444" : "#10b981";
-
-  // Build trend chart data matching 24h PnL direction
-  let sparklineData = [];
-  if (totalUsd > 0) {
-    sparklineData = [...portfolioHistory];
-    const val24hStart = totalUsd - pnl24hUsd;
-    if (sparklineData.length < 2) {
-      sparklineData = [
-        { time: "24h Ago", value: val24hStart },
-        { time: "Now", value: totalUsd },
-      ];
-    } else if (sparklineData.length < 10) {
-      sparklineData = [
-        { time: "24h Ago", value: val24hStart },
-        ...sparklineData,
-      ];
+      setHasInitializedSliders(false);
+      setTimeout(() => {
+        setIsReviewModalOpen(false);
+      }, 1000);
+    } catch (err) {
+      const reason = err?.reason || err?.message || "";
+      if (!reason.includes("user rejected") && !reason.includes("ACTION_REJECTED")) {
+        updateToast(pendingId, {
+          type: "error",
+          title: "Rebalance Failed",
+          message: err?.reason || "Swap transaction failed. Check gas and try again.",
+        });
+      } else {
+        updateToast(pendingId, {
+          type: "warn",
+          title: "Rebalance Cancelled",
+          message: "You rejected the transaction in MetaMask.",
+        });
+      }
+      setIsReviewModalOpen(false);
+      console.error("Rebalance failed:", err);
+    } finally {
+      setActionLoading(false);
     }
-  }
-
-  const getPnlClass = (valUsd, hasBalance) => {
-    if (!hasBalance || totalUsd === 0) return "pnl-neutral";
-    if (valUsd > 0) return "pnl-up";
-    if (valUsd < 0) return "pnl-down";
-    return "pnl-neutral";
   };
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="dashboard">
-      {/* 1. Portfolio Value & Performance Card */}
+
+      {/* 1. Portfolio Summary — Total Value, PnL badges, Sparkline, Asset Grid */}
       <div className="card portfolio-summary">
-        <div className="portfolio-header-flex">
-          <div>
-            <h3 className="card-title">Portfolio Value & Performance</h3>
-            <div className="portfolio-total" id="portfolio-total">
-              ${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-          </div>
-
-          <div className="pnl-metrics">
-            <div className={`pnl-badge ${getPnlClass(pnl24hUsd, totalUsd > 0)}`}>
-              <span className="pnl-label">24h PnL</span>
-              <span className="pnl-value">
-                {totalUsd > 0 ? (
-                  `${pnl24hUsd >= 0 ? "+" : ""}$${pnl24hUsd.toFixed(2)} (${pnl24hPct >= 0 ? "+" : ""}${pnl24hPct.toFixed(2)}%)`
-                ) : (
-                  "$0.00 (0.00%)"
-                )}
-              </span>
-            </div>
-            <div className={`pnl-badge ${getPnlClass(totalPnlUsd, totalDepositedUsd > 0 && totalUsd > 0)}`}>
-              <span className="pnl-label">Total PnL</span>
-              <span className="pnl-value">
-                {totalDepositedUsd > 0 && totalUsd > 0 ? (
-                  `${totalPnlUsd >= 0 ? "+" : ""}$${totalPnlUsd.toFixed(2)} (${totalPnlPct >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}%)`
-                ) : (
-                  "$0.00 (0.00%)"
-                )}
-              </span>
-            </div>
-            <div className="pnl-badge pnl-drift">
-              <span className="pnl-label">Total Absolute Drift</span>
-              <span className="pnl-value">{totalAbsDrift.toFixed(2)}%</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Real-time Portfolio Value Sparkline Area Chart */}
-        {sparklineData.length > 1 && (
-          <div className="portfolio-sparkline-container" style={{ height: "120px", marginTop: "16px" }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={sparklineData}>
-                <defs>
-                  <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={sparkColor} stopOpacity={0.4} />
-                    <stop offset="95%" stopColor={sparkColor} stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="time" hide />
-                <YAxis domain={["auto", "auto"]} hide />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#16172b",
-                    borderColor: "rgba(255,255,255,0.1)",
-                    borderRadius: "6px",
-                  }}
-                  formatter={(val) => [`$${Number(val).toFixed(2)}`, "Portfolio Value"]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="value"
-                  stroke={sparkColor}
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorVal)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Asset Grid: Held assets highlighted first, non-held ($0.00) pushed to the back */}
-        {(() => {
-          const sortedAssetGrid = ASSET_SYMBOLS.map((sym, i) => {
-            const usdVal = Number(ethers.formatEther(portfolioValue.assets[i] || 0n));
-            const priceVal = sym === "USDT" ? 1.0 : Number(prices[i] || 0n) / 1e8;
-            return {
-              sym,
-              index: i,
-              color: ASSET_COLORS[i],
-              usdVal,
-              priceVal,
-              isHeld: usdVal >= 0.01,
-            };
-          }).sort((a, b) => {
-            if (a.isHeld !== b.isHeld) {
-              return a.isHeld ? -1 : 1;
-            }
-            if (a.isHeld && b.isHeld) {
-              return b.usdVal - a.usdVal;
-            }
-            return a.index - b.index;
-          });
-
-          return (
-            <div className="asset-grid" style={{ marginTop: "20px" }}>
-              {sortedAssetGrid.map((item) => {
-                const isUsdt = item.sym === "USDT";
-                const isSelected = selectedChartSymbol === item.sym;
-                return (
-                  <div
-                    key={item.sym}
-                    className={`asset-item ${item.isHeld ? "asset-held" : "asset-unheld"} ${isSelected ? "selected-asset" : ""} ${isUsdt ? "usdt-asset-item" : ""}`}
-                    onClick={() => !isUsdt && setSelectedChartSymbol(item.sym)}
-                    style={{
-                      cursor: isUsdt ? "default" : "pointer",
-                      borderColor: item.isHeld ? `${item.color}55` : "rgba(255, 255, 255, 0.06)",
-                      background: item.isHeld
-                        ? `linear-gradient(135deg, ${item.color}15 0%, rgba(255, 255, 255, 0.02) 100%)`
-                        : "rgba(255, 255, 255, 0.015)",
-                    }}
-                  >
-                    <span
-                      className="asset-dot"
-                      style={{
-                        background: item.isHeld ? item.color : "rgba(255, 255, 255, 0.2)",
-                        boxShadow: item.isHeld ? `0 0 8px ${item.color}a0` : "none",
-                      }}
-                    ></span>
-                    <span
-                      className="asset-name"
-                      style={{ color: item.isHeld ? item.color : "var(--text-muted)", fontWeight: 700 }}
-                    >
-                      {item.sym}
-                    </span>
-                    <span
-                      className="asset-value"
-                      style={{ color: item.isHeld ? "#ffffff" : "var(--text-muted)" }}
-                    >
-                      ${item.usdVal.toLocaleString("en-US", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </span>
-                    <span className="asset-price">
-                      @{isUsdt ? "$1.00" : `$${item.priceVal.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-        {loading && <div className="loading-bar"></div>}
+        <PortfolioSummary
+          portfolioValue={portfolioValue}
+          totalDepositedUsd={totalDepositedUsd}
+          totalPnlUsd={totalPnlUsd}
+          totalPnlPct={totalPnlPct}
+          pnl24hUsd={pnl24hUsd}
+          pnl24hPct={pnl24hPct}
+          portfolioHistory={portfolioHistory}
+          prices={prices}
+          totalAbsDrift={totalAbsDrift}
+          loading={loading}
+          selectedChartSymbol={selectedChartSymbol}
+          onSelectSymbol={setSelectedChartSymbol}
+        />
       </div>
 
-      {/* 2. Allocation & Deposit Row (50% / 50% Split Grid) */}
+      {/* 2. Allocation Charts + Deposit & Sliders (50/50 grid) */}
       <div className="dashboard-grid-2col">
-        {/* Left: 2 Donut Charts (Target Allocation & Actual Allocation) */}
         <div className="grid-col">
-          <div className="card side-charts-card" style={{ height: "100%" }}>
-            <h3 className="card-title" style={{ marginBottom: "12px" }}>Allocation Distribution</h3>
-            <div className="charts-row">
-              {renderPieChart(targetData, "Target Allocation")}
-              {renderPieChart(actualData, "Actual Allocation")}
-            </div>
-          </div>
+          <AllocationCharts
+            assetMetrics={assetMetrics}
+            totalUsd={totalUsd}
+          />
         </div>
 
-        {/* Right: Deposit + Target Allocation Sliders */}
         <div className="grid-col">
-          {/* Deposit Card */}
-          <div className="card">
-            <h3 className="card-title">Deposit (Zap-in)</h3>
-            <div className="input-group">
-              <select
-                id="select-deposit-asset"
-                value={depositAsset}
-                onChange={(e) => setDepositAsset(e.target.value)}
-                className="input-select"
-              >
-                {ASSET_SYMBOLS.map((sym) => (
-                  <option key={sym} value={sym}>
-                    {sym}
-                  </option>
-                ))}
-              </select>
-              <input
-                id="input-deposit-amount"
-                type="number"
-                placeholder="Amount"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                className="input-field"
-              />
-              <button
-                id="btn-deposit"
-                className="action-btn"
-                onClick={handleDeposit}
-                disabled={actionLoading}
-              >
-                Deposit
-              </button>
-            </div>
-          </div>
-
-          {/* Smart Range Slider Allocation Input */}
-          <div className="card slider-allocation-card">
-            <div className="card-header-flex">
-              <h3 className="card-title">Target Allocation (%)</h3>
-              <button className="action-btn btn-sm" onClick={handleEqualWeight}>
-                ⚡ Equal Weight
-              </button>
-            </div>
-
-            <div className="allocation-sliders-grid-3col">
-              {ASSET_SYMBOLS.map((sym, i) => (
-                <div key={sym} className="slider-group">
-                  <div className="slider-label-row">
-                    <span className="slider-sym" style={{ color: ASSET_COLORS[i] }}>
-                      {sym}
-                    </span>
-                    <div className="slider-val-input">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={allocationInputs[i] || "0.00"}
-                        onChange={(e) => {
-                          const copy = [...allocationInputs];
-                          copy[i] = e.target.value;
-                          setAllocationInputs(copy);
-                        }}
-                        className="input-field input-tiny"
-                      />
-                      <span>%</span>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="1"
-                    value={parseFloat(allocationInputs[i] || "0")}
-                    onChange={(e) => {
-                      const copy = [...allocationInputs];
-                      copy[i] = e.target.value;
-                      setAllocationInputs(copy);
-                    }}
-                    className="range-slider"
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Real-time Total Progress Bar */}
-            <div className="total-progress-container">
-              <div className="progress-label-row">
-                <span>Total Allocation:</span>
-                <strong className={isAllocationValid ? "text-success" : "text-danger"}>
-                  {sliderSum.toFixed(2)}% / 100%
-                </strong>
-              </div>
-
-              <div className="progress-track">
-                <div
-                  className={`progress-fill ${isAllocationValid ? "bg-success" : "bg-danger"}`}
-                  style={{ width: `${Math.min(sliderSum, 100)}%` }}
-                ></div>
-              </div>
-
-              {!isAllocationValid && (
-                <div className="progress-warning">
-                  ⚠️ {sliderSum < 100 ? `Total is ${sliderSum.toFixed(2)}%, missing ${(100 - sliderSum).toFixed(2)}%` : `Total exceeds 100% by ${(sliderSum - 100).toFixed(2)}%`}
-                </div>
-              )}
-            </div>
-
-            <div className="btn-row" style={{ marginTop: "16px" }}>
-              <button
-                id="btn-set-allocation"
-                className="action-btn"
-                onClick={handleSetAllocations}
-                disabled={actionLoading || !isAllocationValid}
-              >
-                Set Allocation
-              </button>
-              <button
-                id="btn-rebalance"
-                className="action-btn action-btn-accent"
-                onClick={handleRebalanceClick}
-                disabled={actionLoading}
-              >
-                Rebalance
-              </button>
-            </div>
-          </div>
+          <DepositForm deposit={deposit} />
+          <AllocationSliders
+            allocationInputs={allocationInputs}
+            setAllocationInputs={setAllocationInputs}
+            setAllocations={setAllocations}
+            onRebalanceClick={handleRebalanceClick}
+            actionLoading={actionLoading}
+            targetAllocations={targetAllocations}
+          />
         </div>
       </div>
 
-      {/* 3. Allocation Drift & Risk Monitoring Table */}
-      <div className="card drift-card">
-        <h3 className="card-title">Allocation Drift & Risk Monitoring</h3>
-        <div className="table-container">
-          <table className="data-table drift-table">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Price</th>
-                <th>USD Balance</th>
-                <th>Target %</th>
-                <th>Actual %</th>
-                <th>Drift %</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedAssetMetrics.map((am) => {
-                const isZeroAsset = am.usdValue < 0.01 && am.targetPct < 0.05;
-                const absDrift = Math.abs(am.driftPct);
-                const isZeroDrift = absDrift < 0.005;
+      {/* 3. Drift & Risk Table */}
+      <DriftTable sortedAssetMetrics={sortedAssetMetrics} />
 
-                const isOver = am.driftPct >= 0.5;
-                const isUnder = am.driftPct <= -0.5;
-                const isBalanced = !isOver && !isUnder;
-
-                let driftClass = "drift-zero";
-                let prefix = "";
-
-                if (!isZeroAsset && !isZeroDrift) {
-                  if (am.driftPct > 0) {
-                    driftClass = "drift-pos";
-                    prefix = "+";
-                  } else if (am.driftPct < 0) {
-                    driftClass = "drift-neg";
-                    prefix = "";
-                  }
-                }
-
-                // Precision formatting: 2 decimals if small drift (<1%), 1 decimal if >=1%
-                let driftStr = "0.00%";
-                if (!isZeroAsset && !isZeroDrift) {
-                  const numStr = absDrift < 1.0 ? absDrift.toFixed(2) : absDrift.toFixed(1);
-                  driftStr = `${prefix}${am.driftPct > 0 ? numStr : "-" + numStr}%`;
-                }
-
-                return (
-                  <tr key={am.name} className={isZeroAsset ? "row-zero-balance" : ""}>
-                    <td>
-                      <div className="asset-cell">
-                        <span
-                          className="asset-dot"
-                          style={{
-                            background: isZeroAsset ? "rgba(255, 255, 255, 0.15)" : am.color,
-                          }}
-                        ></span>
-                        <strong style={{ opacity: isZeroAsset ? 0.45 : 1 }}>{am.name}</strong>
-                      </div>
-                    </td>
-                    <td style={{ opacity: isZeroAsset ? 0.45 : 1 }}>
-                      {am.name === "USDT" ? "$1.00" : `$${am.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
-                    </td>
-                    <td style={{ opacity: isZeroAsset ? 0.45 : 1 }}>
-                      ${am.usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </td>
-                    <td style={{ opacity: isZeroAsset ? 0.45 : 1 }}>{am.targetPct.toFixed(1)}%</td>
-                    <td style={{ opacity: isZeroAsset ? 0.45 : 1 }}>{am.actualPct.toFixed(1)}%</td>
-                    <td>
-                      <span className={`drift-badge ${driftClass}`}>
-                        {driftStr}
-                      </span>
-                    </td>
-                    <td>
-                      {isOver && <span className="badge badge-over">OVERWEIGHT</span>}
-                      {isUnder && <span className="badge badge-under">UNDERWEIGHT</span>}
-                      {isBalanced && <span className="badge badge-balanced">BALANCED</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 4. Interactive TradingView Price Chart */}
+      {/* 4. Live Price Chart */}
       <PriceChart
         selectedSymbol={selectedChartSymbol}
         onSelectSymbol={setSelectedChartSymbol}
       />
 
-      {/* 5. Swap History Accordion */}
+      {/* 5. Transaction Log */}
       <TransactionLog />
 
-      {/* 2-Step Rebalance Review Modal */}
+      {/* Rebalance Review Modal */}
       <RebalanceReviewModal
         isOpen={isReviewModalOpen}
-        onClose={() => setIsReviewModalOpen(false)}
+        onClose={() => !actionLoading && setIsReviewModalOpen(false)}
         onConfirm={handleConfirmRebalance}
         balances={balances}
         targetAllocations={

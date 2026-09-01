@@ -1,4 +1,4 @@
-#  DPM — Decentralized Portfolio Manager
+# 🛡️ DPM — Decentralized Portfolio Manager
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Solidity](https://img.shields.io/badge/Solidity-^0.8.20-363636.svg?logo=solidity)](https://soliditylang.org/)
@@ -6,7 +6,7 @@
 [![React](https://img.shields.io/badge/React-18.2.0-61DAFB.svg?logo=react)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-5.0.0-646CFF.svg?logo=vite)](https://vitejs.org/)
 
-**Decentralized Portfolio Manager (DPM)** is a state-of-the-art non-custodial Web3 protocol designed for automated multi-asset portfolio management, real-time price feed integration, allocation drift tracking, bounded multi-pass rebalancing, and 2-step execution review.
+**Decentralized Portfolio Manager (DPM)** is a state-of-the-art non-custodial Web3 protocol for automated multi-asset crypto portfolio management. It features real-time Binance price oracle syncing, asset-tiered drift tolerance monitoring, 2-step simulated execution review, account-isolated PnL tracking, and an automated rebalance keeper bot.
 
 ---
 
@@ -14,49 +14,58 @@
 
 ---
 
-## ✨ Key Features & Technical Highlights
+## ✨ Core Features & Key Innovations
 
-1. 10 Supported Crypto Assets:
-   - Non-custodial support for 10 crypto assets: `WBTC`, `WETH`, `SUI`, `NEAR`, `ARB`, `OP`, `LINK`, `SOL`, `BNB`, and `USDT`.
-   - Single-click deposit using **USDT** (zap-in) or direct multi-asset deposits.
+### 1. 10-Asset Non-Custodial Portfolio & USDT Zap-In
+- Non-custodial support for 10 crypto assets: `WBTC`, `WETH`, `SOL`, `BNB`, `LINK`, `SUI`, `NEAR`, `ARB`, `OP`, and `USDT`.
+- **USDT Zap-In**: Single-click deposit using USDT with automatic account auto-minting for local test environments.
 
 <img width="1775" height="727" alt="image" src="https://github.com/user-attachments/assets/a07d351c-d25c-4349-930b-ea6360e44480" />
 
-2. Bounded Multi-pass Smart Rebalance Algorithm:
-   - Refactored `PortfolioManager.sol` using bounded `while` loops (`swapUsd = Math.min(excessUsd, maxDeficitUsd)`) to iteratively satisfy asset deficits without overshooting or leaving residual imbalance.
-   - Auto-syncs UI slider target allocations to on-chain state before executing rebalance.
+---
 
-3. Real-Time Allocation Drift & Risk Monitoring Table:
-   - Live calculation of **Drift (%) = Actual (%) - Target (%)**.
-   - Automatic risk categorization: `BALANCED`, `OVERWEIGHT` (+0.5%), and `UNDERWEIGHT` (-0.5%).
-   - Total Absolute Drift metric calculation.
+### 2. Multi-State Asset-Tiered Risk Monitoring (`ASSET_DRIFT_TIERS`)
+Instead of a rigid single threshold, DPM dynamically evaluates drift tolerance and risk status based on asset volatility tiers:
+- **Tier 1 (Mega-Cap Core - WBTC, WETH)**: $\pm 2.5\%$ Warning | $\pm 5.0\%$ Action Trigger
+- **Tier 2 (Large-Cap L1 - SOL, BNB)**: $\pm 3.5\%$ Warning | $\pm 7.0\%$ Action Trigger
+- **Tier 3 (Growth & Mid-Cap - LINK, SUI, NEAR)**: $\pm 5.0\%$ Warning | $\pm 10.0\%$ Action Trigger
+- **Tier 4 (Satellite & Volatile - ARB, OP)**: $\pm 7.5\%$ Warning | $\pm 15.0\%$ Action Trigger
+- **Tier 5 (Stablecoin - USDT)**: $\pm 2.0\%$ Warning | $\pm 5.0\%$ Action Trigger
+
+#### Dynamic Multi-State Status Badges:
+- `BALANCED`: Drift is within normal warning tolerance.
+- `OVERWEIGHT` / `UNDERWEIGHT`: Drift exceeds warning threshold but below trigger.
+- `CRITICAL OVER` / `CRITICAL UNDER`: Drift reaches or exceeds action trigger threshold (glowing warning badges).
 
 <img width="1702" height="607" alt="image" src="https://github.com/user-attachments/assets/bbb700e1-308c-4412-9738-9b52474b6b1a" />
 
-4. 2-Step Rebalance Review Modal:
-   - Simulated execution plan table matching smart contract logic prior to on-chain execution.
-   - Detailed sell/buy token routes, estimated output, USD value, gas estimation, and slippage tolerance.
-   - Interactive **Before vs After** allocation preview.
+---
+
+### 3. Bounded Multi-Pass Smart Rebalancing & 2-Step Execution Review
+- **Exact Math Swaps**: Refactored `PortfolioManager.sol` uses bounded iterative matching (`swapUsd = Math.min(excessUsd, maxDeficitUsd)`) to realign asset allocations without overshooting or residual drift.
+- **Review Modal**: 2-step execution review showing simulated swap routes, sell/buy token amounts, estimated outputs, gas estimation, slippage tolerance, and Before vs After allocation previews.
 
 <img width="1632" height="828" alt="image" src="https://github.com/user-attachments/assets/3539706a-bc02-4e00-8f84-2ebfcf002460" />
 
-5. Vibrant 10-Color System & Glassmorphism UI:
-   - 10 distinct, vibrant brand colors for each token (`WBTC` Orange, `WETH` Purple, `SUI` Cyan, `NEAR` Emerald Green, `ARB` Electric Blue, `OP` Crimson Red, `LINK` Royal Blue, `SOL` Neon Magenta, `BNB` Amber Yellow, `USDT` Mint Teal).
-   - High-contrast Asset Ticker Grid: held assets highlighted with brand-colored borders and micro-gradients; 0% balance assets pushed to the back with dashed borders.
+---
 
-6. Sleek Donut Charts & 2-Column Legend Grid:
-   - Integrated center stats badge inside donut charts (`100% TARGET` / `$Total PORTFOLIO`).
-   - Clean 2-column legend grid positioned above charts with deterministic sorting (active assets ordered by allocation %, 0% inactive assets pushed to the bottom in muted gray).
-   - Custom floating glassmorphism tooltips preventing text collision.
+### 4. Account-Isolated On-Chain PnL & Deposited Tracking
+- **On-Chain Event Filtering**: `Deposited` events on the smart contract are filtered strictly by `account.toLowerCase()`.
+- **Zero Cross-Account Leakage**: Connecting or switching between MetaMask accounts (`Account 1`, `Account 2`, `Account 3`) isolated Deposited totals, PnL calculations, and sparkline history completely per wallet address.
 
-7. Interactive Price Charts & Live Binance Oracles:
-   - Candlestick price chart with 1m, 15m, 1h, and 1d timeframes powered by live Binance WebSocket & REST Klines.
-   - Live real-time price oracle updater script (`updatePrices.js`) continuously refreshing 9 asset price feeds on Hardhat Localhost.
+---
+
+### 5. Live Binance Price Feeds & Real-Time Price Oracles
+- Continuous live price synchronization from Binance API into on-chain `MockAggregator` contracts via `updatePrices.js`.
+- Interactive price chart powered by Binance WebSocket & REST Klines supporting 1m, 15m, 1h, and 1d timeframes.
 
 <img width="1742" height="536" alt="image" src="https://github.com/user-attachments/assets/06f19b41-df50-4f63-8d15-dbf9d0ea046b" />
 
-8. Transaction History & Grouped Accordions:
-   - Grouped swap log accordion displaying all past rebalancing batches with transaction hashes and status badges.
+---
+
+### 6. Automated Keeper Bot & One-Click Stack Launcher
+- **Auto-Rebalance Keeper**: Background bot (`autoRebalanceKeeper.js`) continuously checks portfolio deviation (`checkDeviation`) and triggers automated rebalancing when drift exceeds 5%.
+- **One-Click Launcher (`start-all.bat`)**: Automated batch script that launches Hardhat node, deploys smart contracts with live prices, starts the price feeder bot, starts the keeper bot, and opens the frontend dev server.
 
 <img width="1713" height="861" alt="image" src="https://github.com/user-attachments/assets/b47d1dda-5e45-4606-a64b-7f3e4019c36c" />
 
@@ -67,7 +76,7 @@
 ```
                      ┌──────────────────────────────────────────┐
                      │          React + Vite Frontend           │
-                     │  (ethers.js, Recharts, Binance WebSockets│
+                     │  (Ethers.js v6, Recharts, Binance WS)    │
                      └────────────────────┬─────────────────────┘
                                           │
                                           ▼
@@ -77,17 +86,17 @@
                      └─────────┬──────────────────────┬─────────┘
                                │                      │
                                ▼                      ▼
-                   ┌──────────────────────┐ ┌───────────────────┐
-                   │    MockSwapRouter    │ │    PriceOracle    │
-                   │ (Uniswap V3 Simulated│ │ (Chainlink Oracles│
-                   └──────────────────────┘ └───────────────────┘
+                    ┌──────────────────────┐ ┌───────────────────┐
+                    │    MockSwapRouter    │ │    PriceOracle    │
+                    │ (Uniswap V3 Simulated│ │ (Chainlink Oracles│
+                    └──────────────────────┘ └───────────────────┘
 ```
 
 - **Smart Contracts**: Solidity `^0.8.20` (compiled with `--via-ir`), OpenZeppelin Contracts v5.
 - **Development Framework**: Hardhat, Ethers.js v6.
-- **Frontend UI/UX**: React 18, Vite, Vanilla CSS with custom glassmorphism design system.
+- **Frontend Framework**: React 18, Vite, Vanilla CSS with custom glassmorphism design system.
 - **Data Visualizations**: Recharts, Lightweight Charts.
-- **Market Data Feeds**: Binance REST & WebSocket API, Chainlink Aggregator V3 feeds.
+- **Market Data Oracles**: Binance REST & WebSocket API, Chainlink Aggregator V3 feeds.
 
 ---
 
@@ -110,22 +119,31 @@ defi-portfolio-manager/
 │   │   ├── config/          # Contract ABIs, Addresses, & Asset Mappings
 │   │   └── hooks/           # Custom React Hooks (usePortfolio)
 │   └── public/              # Static Assets & Brand Logo
+├── start-all.bat            # One-Click Full Stack Launcher (Windows CMD)
+├── start-all.ps1            # One-Click Full Stack Launcher (PowerShell)
 └── README.md
 ```
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## 🚀 Quickstart & Local Running Guide
 
-### 1. Prerequisites
-- Node.js `v18.x` or later
-- npm or pnpm
-- MetaMask extension installed in browser
+### Option 1: One-Click Launcher (Recommended)
 
-### 2. Install Dependencies
+Simply double-click **`start-all.bat`** (or run `.\start-all.ps1` in PowerShell) from the project root. It will automatically:
+1. Launch Hardhat Node on port `8545`.
+2. Deploy Smart Contracts with live Binance spot prices.
+3. Launch Real-time Price Feeder bot (`updatePrices.js`).
+4. Launch Automated Rebalance Keeper bot (`autoRebalanceKeeper.js`).
+5. Launch Frontend Dev Server on `http://localhost:5173`.
 
+---
+
+### Option 2: Manual Terminal Setup
+
+#### 1. Install Dependencies
 ```bash
-# Install root contract dependencies
+# Install smart contract dependencies
 cd contracts
 npm install
 
@@ -134,37 +152,37 @@ cd ../frontend
 npm install
 ```
 
-### 3. Run Local Blockchain & Deploy Contracts
-
-Open Terminal 1 (Start Hardhat Node):
+#### 2. Start Hardhat Local Node (Terminal 1)
 ```bash
 cd contracts
 npx hardhat node
 ```
 
-Open Terminal 2 (Deploy Contracts):
+#### 3. Deploy Smart Contracts (Terminal 2)
 ```bash
 cd contracts
 npx hardhat run scripts/deploy.js --network localhost
 ```
 
-### 4. Start Real-time Price Feeder (Binance Live Prices for 10 Assets)
-
-Open Terminal 3 (Price Oracle Feeder):
+#### 4. Start Price Feeder Bot (Terminal 3)
 ```bash
 cd contracts
 npx hardhat run scripts/updatePrices.js --network localhost
 ```
 
-### 5. Start Frontend Application
+#### 5. Start Automated Keeper Bot (Terminal 4)
+```bash
+cd contracts
+npx hardhat run scripts/autoRebalanceKeeper.js --network localhost
+```
 
-Open Terminal 4 (Vite Dev Server):
+#### 6. Start Frontend App (Terminal 5)
 ```bash
 cd frontend
 npm run dev
 ```
 
-Visit `http://localhost:3000` in your browser.
+Visit `http://localhost:5173` in your browser.
 
 ---
 

@@ -3,6 +3,7 @@ import { ethers } from "ethers";
 import {
   PORTFOLIO_MANAGER_ADDRESS,
   PRICE_ORACLE_ADDRESS,
+  PRICE_FEED_ADDRESSES,
   PORTFOLIO_MANAGER_ABI,
   PRICE_ORACLE_ABI,
   ERC20_ABI,
@@ -19,13 +20,14 @@ export function PortfolioProvider({ children }) {
   const [account, setAccount] = useState(null);
   const [provider, setProvider] = useState(null);
   const [signer, setSigner] = useState(null);
+  const [chainId, setChainId] = useState(null);
   const [nativeBalance, setNativeBalance] = useState("0");
   const [balances, setBalances] = useState(Array(10).fill(0n));
   const [targetAllocations, setTargetAllocations] = useState(Array(10).fill(0n));
   const [portfolioValue, setPortfolioValue] = useState({ total: 0n, assets: Array(10).fill(0n) });
   const [prices, setPrices] = useState(Array(10).fill(0n));
   const [swapEvents, setSwapEvents] = useState([]);
-  
+
   // Cost Basis & Real-time PnL states
   const [totalDepositedUsd, setTotalDepositedUsd] = useState(0);
   const [pnl24hUsd, setPnl24hUsd] = useState(0);
@@ -52,13 +54,7 @@ export function PortfolioProvider({ children }) {
   const getOrInitCostBasis = useCallback((userAddress, currentValUsd) => {
     if (!userAddress) return 0;
     const key = `dpm_cost_basis_${userAddress.toLowerCase()}`;
-    const timeKey = `dpm_first_deposit_time_${userAddress.toLowerCase()}`;
     try {
-      if (currentValUsd <= 0) {
-        localStorage.removeItem(key);
-        localStorage.removeItem(timeKey);
-        return 0;
-      }
       const saved = localStorage.getItem(key);
       if (saved && parseFloat(saved) > 0) {
         return parseFloat(saved);
@@ -100,10 +96,12 @@ export function PortfolioProvider({ children }) {
       const accounts = await browserProvider.send("eth_requestAccounts", []);
       const userSigner = await browserProvider.getSigner();
       const userAddress = accounts[0];
+      const network = await browserProvider.getNetwork();
 
       setProvider(browserProvider);
       setSigner(userSigner);
       setAccount(userAddress);
+      setChainId(Number(network.chainId));
 
       const bal = await browserProvider.getBalance(userAddress);
       setNativeBalance(ethers.formatEther(bal));
@@ -160,6 +158,8 @@ export function PortfolioProvider({ children }) {
     }
   }, []);
 
+
+
   // Fetch 24hr Binance Price Change %
   const fetch24hBinanceTicker = useCallback(async () => {
     try {
@@ -184,6 +184,43 @@ export function PortfolioProvider({ children }) {
       return {};
     }
   }, []);
+
+  // Query Deposited events on-chain for exact account-isolated cost basis
+  const fetchDepositedHistory = useCallback(async () => {
+    if (!provider || !account) return null;
+    try {
+      const contract = getPortfolioContract(provider);
+      const oracle = getOracleContract(provider);
+
+      const [events, oraclePrices, livePriceMap] = await Promise.all([
+        contract.queryFilter("Deposited", 0, "latest"),
+        oracle.getLatestPrices(),
+        fetchLivePrices(),
+      ]);
+
+      const userEvents = events.filter(
+        (e) => e.args && e.args[0] && e.args[0].toLowerCase() === account.toLowerCase()
+      );
+
+      if (userEvents.length === 0) return null;
+
+      let totalDepUsd = 0;
+      userEvents.forEach((e) => {
+        const assetIndex = Number(e.args[1]);
+        const amountWei = e.args[2];
+        const sym = ASSET_SYMBOLS[assetIndex];
+        const oracleP = Number(oraclePrices[assetIndex] || 0n) / 1e8;
+        const liveP = livePriceMap[sym] || oracleP;
+        const amtNum = Number(ethers.formatEther(amountWei));
+        totalDepUsd += amtNum * (sym === "USDT" ? 1.0 : liveP);
+      });
+
+      return totalDepUsd;
+    } catch (err) {
+      console.warn("Failed to fetch deposited history:", err);
+      return null;
+    }
+  }, [provider, account, getPortfolioContract, getOracleContract, fetchLivePrices]);
 
   const refreshPortfolio = useCallback(async () => {
     if (!provider || !account) return;
@@ -223,8 +260,22 @@ export function PortfolioProvider({ children }) {
       });
       setPrices(updatedPricesArr);
 
-      // Cost basis & PnL
-      const costBasis = getOrInitCostBasis(account, calculatedTotalUsd);
+      // Cost basis & PnL (Account-isolated via on-chain Deposited events)
+      const onChainDepositedUsd = await fetchDepositedHistory();
+      let costBasis = 0;
+
+      if (onChainDepositedUsd !== null && onChainDepositedUsd > 0) {
+        costBasis = onChainDepositedUsd;
+      } else {
+        costBasis = getOrInitCostBasis(account, calculatedTotalUsd);
+      }
+
+      if (account && costBasis > 0) {
+        try {
+          localStorage.setItem(`dpm_cost_basis_${account.toLowerCase()}`, costBasis.toString());
+        } catch (e) {}
+      }
+
       setTotalDepositedUsd(costBasis);
 
       const calcTotalPnlUsd = costBasis > 0 ? calculatedTotalUsd - costBasis : 0;
@@ -252,8 +303,9 @@ export function PortfolioProvider({ children }) {
       setPnl24hUsd(calc24hUsd);
       setPnl24hPct(calc24hPct);
 
-      // Portfolio History Sparkline
-      if (calculatedTotalUsd > 0) {
+      // Portfolio History Sparkline (Account-isolated)
+      if (calculatedTotalUsd > 0 && account) {
+        const accountHistoryKey = `dpm_history_${account.toLowerCase()}`;
         setPortfolioHistory((prev) => {
           const timeLabel = new Date().toLocaleTimeString([], {
             hour: "2-digit",
@@ -267,24 +319,17 @@ export function PortfolioProvider({ children }) {
           const next = [...prev, { time: timeLabel, value: calculatedTotalUsd }];
           const trimmed = next.slice(-30);
           try {
-            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(trimmed));
+            localStorage.setItem(accountHistoryKey, JSON.stringify(trimmed));
           } catch (e) {
             console.warn("Could not save history:", e);
           }
           return trimmed;
         });
-      } else {
-        setPortfolioHistory([]);
-        try {
-          localStorage.removeItem(HISTORY_STORAGE_KEY);
-        } catch (e) {
-          console.warn("Could not clear history:", e);
-        }
       }
     } catch (err) {
       console.error("Portfolio refresh failed:", err);
     }
-  }, [provider, account, getPortfolioContract, getOracleContract, getOrInitCostBasis, getOrInitDepositTime, fetchLivePrices, fetch24hBinanceTicker]);
+  }, [provider, account, getPortfolioContract, getOracleContract, fetchDepositedHistory, getOrInitCostBasis, getOrInitDepositTime, fetchLivePrices, fetch24hBinanceTicker]);
 
   const fetchSwapHistory = useCallback(async () => {
     if (!provider || !account) return;
@@ -329,7 +374,7 @@ export function PortfolioProvider({ children }) {
 
   const deposit = useCallback(
     async (tokenSymbol, amount) => {
-      if (!signer) return;
+      if (!signer) throw new Error("Wallet not connected");
       try {
         const contract = getPortfolioContract(signer);
         const assetIndex = ASSET_SYMBOLS.indexOf(tokenSymbol);
@@ -337,6 +382,19 @@ export function PortfolioProvider({ children }) {
 
         const tokenAddr = TOKEN_ADDRESSES[tokenSymbol];
         const tokenContract = new ethers.Contract(tokenAddr, ERC20_ABI, signer);
+
+        // Auto-mint mock test tokens if wallet balance is insufficient
+        try {
+          const userBal = await tokenContract.balanceOf(account);
+          if (userBal < amount) {
+            const mintTarget = amount > ethers.parseEther("10000") ? amount : ethers.parseEther("10000");
+            const mintTx = await tokenContract.mint(account, mintTarget);
+            await mintTx.wait();
+          }
+        } catch (mintErr) {
+          console.warn("Auto-mint skipped or failed:", mintErr);
+        }
+
         const allowance = await tokenContract.allowance(account, PORTFOLIO_MANAGER_ADDRESS);
         if (allowance < amount) {
           const approveTx = await tokenContract.approve(PORTFOLIO_MANAGER_ADDRESS, ethers.MaxUint256);
@@ -345,31 +403,19 @@ export function PortfolioProvider({ children }) {
         const tx = await contract.deposit(assetIndex, amount);
         await tx.wait();
 
-        const amountNum = Number(ethers.formatEther(amount));
-        const priceNum = tokenSymbol === "USDT" ? 1.0 : Number(prices[assetIndex] || 0n) / 1e8;
-        const depositUsdVal = amountNum * priceNum;
-
-        setTotalDepositedUsd((prev) => {
-          const newBasis = prev + depositUsdVal;
-          if (account) {
-            try {
-              localStorage.setItem(`dpm_cost_basis_${account.toLowerCase()}`, newBasis.toString());
-              if (!localStorage.getItem(`dpm_first_deposit_time_${account.toLowerCase()}`)) {
-                localStorage.setItem(`dpm_first_deposit_time_${account.toLowerCase()}`, Date.now().toString());
-              }
-            } catch (e) {
-              console.warn("Could not update cost basis in storage:", e);
+        if (account) {
+          try {
+            if (!localStorage.getItem(`dpm_first_deposit_time_${account.toLowerCase()}`)) {
+              localStorage.setItem(`dpm_first_deposit_time_${account.toLowerCase()}`, Date.now().toString());
             }
+          } catch (e) {
+            console.warn("Could not update deposit time in storage:", e);
           }
-          return newBasis;
-        });
+        }
 
         await refreshPortfolio();
+        return tx;
       } catch (err) {
-        if (err.code === "ACTION_REJECTED" || err.code === 4001) {
-          console.warn("User rejected the transaction");
-          return;
-        }
         console.error("Deposit failed:", err);
         throw err;
       }
@@ -379,17 +425,14 @@ export function PortfolioProvider({ children }) {
 
   const setAllocations = useCallback(
     async (allocations) => {
-      if (!signer) return;
+      if (!signer) throw new Error("Wallet not connected");
       try {
         const contract = getPortfolioContract(signer);
         const tx = await contract.setTargetAllocation(allocations);
         await tx.wait();
         await refreshPortfolio();
+        return tx;
       } catch (err) {
-        if (err.code === "ACTION_REJECTED" || err.code === 4001) {
-          console.warn("User rejected the transaction");
-          return;
-        }
         console.error("Set allocation failed:", err);
         throw err;
       }
@@ -397,23 +440,24 @@ export function PortfolioProvider({ children }) {
     [signer, getPortfolioContract, refreshPortfolio]
   );
 
-  const rebalance = useCallback(async () => {
-    if (!signer) return;
-    try {
-      const contract = getPortfolioContract(signer);
-      const tx = await contract.executeRebalance({ gasLimit: 3000000 });
-      await tx.wait();
-      await fetchSwapHistory();
-      await refreshPortfolio();
-    } catch (err) {
-      if (err.code === "ACTION_REJECTED" || err.code === 4001) {
-        console.warn("User rejected the transaction");
-        return;
+  const rebalance = useCallback(
+    async (_allocationsBps) => {
+      if (!signer) throw new Error("Wallet not connected");
+      try {
+        const contract = getPortfolioContract(signer);
+        // Single TX: executeRebalance only. Target allocations must already be saved on-chain.
+        const tx = await contract.executeRebalance({ gasLimit: 3000000 });
+        await tx.wait();
+        await fetchSwapHistory();
+        await refreshPortfolio();
+        return tx;
+      } catch (err) {
+        console.error("Rebalance failed:", err);
+        throw err;
       }
-      console.error("Rebalance failed:", err);
-      throw err;
-    }
-  }, [signer, getPortfolioContract, fetchSwapHistory, refreshPortfolio]);
+    },
+    [signer, getPortfolioContract, fetchSwapHistory, refreshPortfolio]
+  );
 
   useEffect(() => {
     if (!account || !provider) return;
@@ -447,16 +491,40 @@ export function PortfolioProvider({ children }) {
 
   useEffect(() => {
     if (!window.ethereum) return;
-    const handleAccountsChanged = (accounts) => {
+    const handleAccountsChanged = async (accounts) => {
       if (accounts.length === 0) {
         disconnectWallet();
       } else {
-        setAccount(accounts[0]);
+        const userAddress = accounts[0];
+        setAccount(userAddress);
+        try {
+          const browserProvider = new ethers.BrowserProvider(window.ethereum);
+          const userSigner = await browserProvider.getSigner();
+          setProvider(browserProvider);
+          setSigner(userSigner);
+
+          const bal = await browserProvider.getBalance(userAddress);
+          setNativeBalance(ethers.formatEther(bal));
+
+          const savedBasis = localStorage.getItem(`dpm_cost_basis_${userAddress.toLowerCase()}`);
+          setTotalDepositedUsd(savedBasis ? parseFloat(savedBasis) || 0 : 0);
+
+          const accountHistoryKey = `dpm_history_${userAddress.toLowerCase()}`;
+          const savedHistory = localStorage.getItem(accountHistoryKey);
+          setPortfolioHistory(savedHistory ? JSON.parse(savedHistory) : []);
+        } catch (e) {
+          console.warn("Account change re-initialization error:", e);
+        }
       }
     };
+    const handleChainChanged = (hexChainId) => {
+      setChainId(parseInt(hexChainId, 16));
+    };
     window.ethereum.on("accountsChanged", handleAccountsChanged);
+    window.ethereum.on("chainChanged", handleChainChanged);
     return () => {
       window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+      window.ethereum.removeListener("chainChanged", handleChainChanged);
     };
   }, [disconnectWallet]);
 
@@ -471,6 +539,7 @@ export function PortfolioProvider({ children }) {
         account,
         provider,
         signer,
+        chainId,
         nativeBalance,
         balances,
         targetAllocations,

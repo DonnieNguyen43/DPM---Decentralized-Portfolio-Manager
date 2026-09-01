@@ -101,6 +101,48 @@ contract PortfolioManager is ReentrancyGuard {
         _rebalanceFor(msg.sender);
     }
 
+    function executeRebalanceWithPrices(int256[NUM_ASSETS] calldata livePrices) external nonReentrant {
+        if (priceOracle != address(0)) {
+            int256[9] memory feedPrices;
+            for (uint256 i = 0; i < 9; i++) {
+                feedPrices[i] = livePrices[i];
+            }
+            (bool ok, ) = priceOracle.call(
+                abi.encodeWithSignature("updateFeedPrices(int256[9])", feedPrices)
+            );
+            ok; // silent fallback
+        }
+        _rebalanceFor(msg.sender);
+    }
+
+    function executeRebalanceWithAllocationsAndPrices(
+        uint256[NUM_ASSETS] calldata allocations,
+        int256[NUM_ASSETS] calldata livePrices
+    ) external nonReentrant {
+        uint256 totalAlloc;
+        for (uint256 i; i < NUM_ASSETS; ++i) {
+            totalAlloc += allocations[i];
+        }
+        if (totalAlloc == BASIS_POINTS) {
+            investors[msg.sender].targetAllocations = allocations;
+            investors[msg.sender].active = true;
+            emit AllocationSet(msg.sender, allocations);
+        }
+
+        if (priceOracle != address(0)) {
+            int256[9] memory feedPrices;
+            for (uint256 i = 0; i < 9; i++) {
+                feedPrices[i] = livePrices[i];
+            }
+            (bool ok, ) = priceOracle.call(
+                abi.encodeWithSignature("updateFeedPrices(int256[9])", feedPrices)
+            );
+            ok;
+        }
+
+        _rebalanceFor(msg.sender);
+    }
+
     function executeRebalanceFor(address user) external nonReentrant {
         _rebalanceFor(user);
     }

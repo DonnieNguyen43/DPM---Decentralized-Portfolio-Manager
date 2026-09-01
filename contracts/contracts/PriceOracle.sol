@@ -18,6 +18,21 @@ contract PriceOracle {
         }
     }
 
+    function updateFeedPrices(int256[NUM_FEEDS] calldata newPrices) external {
+        for (uint256 i = 0; i < NUM_FEEDS; i++) {
+            if (newPrices[i] > 0) {
+                (bool ok, ) = address(feeds[i]).call(
+                    abi.encodeWithSignature("updateAnswer(int256)", newPrices[i])
+                );
+                if (!ok) {
+                    address(feeds[i]).call(
+                        abi.encodeWithSignature("setPrice(int256)", newPrices[i])
+                    );
+                }
+            }
+        }
+    }
+
     function getLatestPrices() external view returns (int256[NUM_ASSETS] memory prices) {
         for (uint256 i = 0; i < NUM_FEEDS; i++) {
             (, prices[i], , , ) = feeds[i].latestRoundData();

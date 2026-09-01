@@ -234,7 +234,13 @@ export default function PriceChart({ selectedSymbol, onSelectSymbol }) {
         </div>
       </div>
 
-      <div className="price-chart-body" ref={chartContainerRef} style={{ height: "300px", width: "100%" }}></div>
+      <div
+        className="price-chart-body"
+        ref={chartContainerRef}
+        style={{ height: "clamp(240px, 30vw, 380px)", width: "100%" }}
+        aria-label={`${currentToken} price chart`}
+        role="img"
+      />
     </div>
   );
 }
